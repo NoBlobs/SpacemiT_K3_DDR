@@ -1,0 +1,9 @@
+289dc2b7bd25bf9d88ce9e7e263e95234868ca14
+ drivers/ddr/spacemit/k3/Kconfig                    |  39 ++++
+ drivers/ddr/spacemit/k3/Makefile                   |  10 ++
+ drivers/ddr/spacemit/k3/ddr_init.c                 |  22 +++
+ drivers/ddr/spacemit/k3/k3_ddr.h                   |  16 ++
+ drivers/ddr/spacemit/k3/lpddr5_init.c              |  21 ++-
+ .../ddr/spacemit/k3/lpddr5_pre_training_table.c    |   7 +-
+ drivers/ddr/spacemit/k3/lpddr_common.c             | 199 +++++++++++++--------
+ 7 files changed, 234 insertions(+), 80 deletions(-)

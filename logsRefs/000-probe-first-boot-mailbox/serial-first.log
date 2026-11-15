@@ -1,0 +1,17 @@
+[  0.401505] fastboot_handle_command: 0004aa20
+[  0.401505] Starting download of 305696 bytes
+[  0.401505] usb_tx_bytes : start len[12]
+[  0.401505] usb_rx_bytes : start len[305696]
+[  0.401505] usb_tx_bytes : start len[4]
+[  0.401505] usb_rx_bytes : start len[4096]
+[  0.501755] fastboot_handle_command: continue
+[  0.501755] usb_tx_bytes : start len[4]
+[  0.602051] j...
+[  0.602051] 
+[  0.602051] U-Boot SPL 2022.10-dirty (Nov 15 2026 - 08:28:48 -0300)
+[  0.702269] LPDDR5 total size: 16 GB, data rate: 6400 MT/s
+[ 10.621580] PMU0 mailbox timeout (last code 0x0)
+[ 10.621580] DDR@cb000000: PMU training failed (0xfe)
+[ 20.641181] PMU1 mailbox timeout (last code 0x0)
+[ 20.641181] DDR@cc000000: PMU training failed (0xfe)
+[ 20.641181] DDR init aborted: PMU firmware failed; DDRC ports stay disabled

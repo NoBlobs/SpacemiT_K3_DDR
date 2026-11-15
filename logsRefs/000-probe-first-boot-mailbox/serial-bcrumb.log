@@ -1,0 +1,25 @@
+[  0.401425] fastboot_handle_command: 0004ad20
+[  0.401425] Starting download of 306464 bytes
+[  0.401425] usb_tx_bytes : start len[12]
+[  0.401425] usb_rx_bytes : start len[306464]
+[  0.501746] usb_tx_bytes : start len[4]
+[  0.501746] usb_rx_bytes : start len[4096]
+[  0.501746] fastboot_handle_command: continue
+[  0.501746] usb_tx_bytes : start len[4]
+[  0.602080] j...
+[  0.602080] 
+[  0.602080] U-Boot SPL 2022.10-dirty (Nov 15 2026 - 08:30:12 -0300)
+[  0.702339] LPDDR5 total size: 16 GB, data rate: 6400 MT/s
+[ 10.722086] PMU0 mailbox timeout (last code 0x0)
+[ 10.722086] PMU0 D regs: d0004=0003 d0031=0001 d0032=0000 d0034=0000 c0004=0001 c0032=0000 c0033=0001 c0034=0000 d0000=0000 d0099=0001 c0080=0003
+[ 10.722086] PMU0 D bcrumb: c0de 0001 0001 0000 0001 0001 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000
+[ 10.722086] PMU0 D imem: 01fc 0000 0258 0000 0258 0000 0258 0000 @1fc: 200a 0f80 8000 3f00
+[ 10.722086] PMU0 D dmem5a000: 4f42 5052 0000 0001 0000 0000 0000 0000
+[ 10.722086] DDR@cb000000: PMU training failed (0xfe)
+[ 20.740193] PMU1 mailbox timeout (last code 0x0)
+[ 20.740193] PMU1 D regs: d0004=0003 d0031=0001 d0032=0000 d0034=0000 c0004=0001 c0032=0000 c0033=0001 c0034=0000 d0000=0000 d0099=0001 c0080=0003
+[ 20.740193] PMU1 D bcrumb: c0de 0001 0001 0000 0001 0001 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000
+[ 20.740193] PMU1 D imem: 01fc 0000 0258 0000 0258 0000 0258 0000 @1fc: 200a 0f80 8000 3f00
+[ 20.740193] PMU1 D dmem5a000: 4f42 5052 0000 0001 0000 0000 0000 0000
+[ 20.740193] DDR@cc000000: PMU training failed (0xfe)
+[ 20.740193] DDR init aborted: PMU firmware failed; DDRC ports stay disabled
