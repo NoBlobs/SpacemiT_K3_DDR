@@ -12,9 +12,11 @@ struct train_ctx {
 	uint8_t cs_a, cs_b;
 	uint8_t dq_a, dq_b;
 	uint8_t x8;
+	uint8_t pstate;
 };
 
-enum train_status { TRAIN_OK = 0, TRAIN_FAIL, TRAIN_NOT_IMPLEMENTED };
+/* TRAIN_PARTIAL: the implemented part succeeded, the stage is not complete. */
+enum train_status { TRAIN_OK = 0, TRAIN_FAIL, TRAIN_NOT_IMPLEMENTED, TRAIN_PARTIAL };
 
 enum train_status stage_devinit(struct train_ctx *c);
 enum train_status stage_wrlvl(struct train_ctx *c);

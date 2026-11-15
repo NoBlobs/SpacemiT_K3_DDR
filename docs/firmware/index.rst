@@ -14,6 +14,7 @@ Implementation of the free PMU firmware (``src/``).
    runtime
    mailbox-pmu
    streaming-ids
+   experiment-firmwares
    devinit
    training-engine
    stages

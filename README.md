@@ -28,6 +28,10 @@ replaces them with free software written from a clean-room specification.
    - public **ARCv2/EM** ISA and GNU toolchain documentation;
    - public U-Boot SPL sources and device trees for the K3 (excluding the arrays
      that embed the proprietary PMU firmware);
+   - public open-source code of other SoCs that use the same Synopsys DWC
+     LPDDR4/5 PHY (for example NXP i.MX U-Boot and TF-A), **only** for host-side
+     register names, semantics and initialization tables — never the PMU
+     firmware binaries those projects also ship (allowed since 2026-11-15);
    - controlled experiments on the reference board using **this** firmware.
 
 The clean team never reads, runs on purpose, or disassembles the proprietary PMU

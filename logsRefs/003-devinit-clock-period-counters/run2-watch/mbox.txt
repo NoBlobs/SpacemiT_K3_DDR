@@ -1,0 +1,48 @@
+     7529506 PMU0 major 0x30 train start
+     7530402 PMU0 major 0x40 stage bit 0
+     7532165 PMU0 major 0x08 STREAM
+     7537542 PMU0 DEVINIT_STATE: 0xc0086=0x1 0x100a3=0xb33 0x20060=0x2
+     7538512 PMU0 major 0x08 STREAM
+     7545476 PMU0 DEVINIT_WATCH: tag=0x0 t=0.17us trig=0x0 tca=0x0 tdq=0x0
+     7546446 PMU0 major 0x08 STREAM
+     7553411 PMU0 DEVINIT_WATCH: tag=0x100 t=7932.32us trig=0x0 tca=0x0 tdq=0x0
+     7554381 PMU0 major 0x08 STREAM
+     7561345 PMU0 DEVINIT_WATCH: tag=0x1 t=0.17us trig=0x0 tca=0x0 tdq=0x0
+     7562315 PMU0 major 0x08 STREAM
+     7569280 PMU0 DEVINIT_WATCH: tag=0x101 t=7932.11us trig=0x0 tca=0x0 tdq=0x0
+     7570250 PMU0 major 0x08 STREAM
+     7577215 PMU0 DEVINIT_WATCH: tag=0x2 t=0.17us trig=0x1 tca=0x0 tdq=0x0
+     7578185 PMU0 major 0x08 STREAM
+     7585149 PMU0 DEVINIT_WATCH: tag=0x102 t=7932.16us trig=0x1 tca=0x0 tdq=0x0
+     7586119 PMU0 major 0x08 STREAM
+     7593084 PMU0 DEVINIT_WATCH: tag=0x3 t=0.17us trig=0x0 tca=0x0 tdq=0x0
+     7594054 PMU0 major 0x08 STREAM
+     7601018 PMU0 DEVINIT_WATCH: tag=0x103 t=7932.11us trig=0x0 tca=0x0 tdq=0x0
+     7601988 PMU0 major 0x08 STREAM
+     7613008 PMU0 DEVINIT_CAL: ctrl=0x6f trig0=0x0 tca0=0x0 tdq0=0x0 tca=0x0(0) tdq=0x0(0) val=0 n=0 bucket=0x0 ab=0x0
+     7613978 PMU0 major 0x08 STREAM
+     7618562 PMU0 STAGE: bit=0 status=1
+    12543164 PMU1 major 0x30 train start
+    12544168 PMU1 major 0x40 stage bit 0
+    12546020 PMU1 major 0x08 STREAM
+    12551485 PMU1 DEVINIT_STATE: 0xc0086=0x1 0x100a3=0xb33 0x20060=0x2
+    12552543 PMU1 major 0x08 STREAM
+    12559596 PMU1 DEVINIT_WATCH: tag=0x0 t=0.17us trig=0x0 tca=0x0 tdq=0x0
+    12560654 PMU1 major 0x08 STREAM
+    12567707 PMU1 DEVINIT_WATCH: tag=0x100 t=8108.20us trig=0x0 tca=0x0 tdq=0x0
+    12568765 PMU1 major 0x08 STREAM
+    12575817 PMU1 DEVINIT_WATCH: tag=0x1 t=0.17us trig=0x0 tca=0x0 tdq=0x0
+    12576876 PMU1 major 0x08 STREAM
+    12583929 PMU1 DEVINIT_WATCH: tag=0x101 t=8108.30us trig=0x0 tca=0x0 tdq=0x0
+    12584986 PMU1 major 0x08 STREAM
+    12592039 PMU1 DEVINIT_WATCH: tag=0x2 t=0.17us trig=0x1 tca=0x0 tdq=0x0
+    12593097 PMU1 major 0x08 STREAM
+    12600150 PMU1 DEVINIT_WATCH: tag=0x102 t=8108.19us trig=0x1 tca=0x0 tdq=0x0
+    12601208 PMU1 major 0x08 STREAM
+    12608261 PMU1 DEVINIT_WATCH: tag=0x3 t=0.17us trig=0x0 tca=0x0 tdq=0x0
+    12609319 PMU1 major 0x08 STREAM
+    12616372 PMU1 DEVINIT_WATCH: tag=0x103 t=8108.20us trig=0x0 tca=0x0 tdq=0x0
+    12617430 PMU1 major 0x08 STREAM
+    12628538 PMU1 DEVINIT_CAL: ctrl=0x6f trig0=0x0 tca0=0x0 tdq0=0x0 tca=0x0(0) tdq=0x0(0) val=0 n=0 bucket=0x0 ab=0x0
+    12629597 PMU1 major 0x08 STREAM
+    12634269 PMU1 STAGE: bit=0 status=1

@@ -21,6 +21,20 @@ findings become ``logsRefs/NNN-<name>/`` records (see :lr:`README.md`).
 Clean-room record
 -----------------
 
+* 2026-11-15 — **source policy extended** (decision of the project owner):
+  public open-source code of other SoCs using the same Synopsys DWC LPDDR4/5
+  PHY (NXP i.MX U-Boot, TF-A ``drivers/nxp/ddr``) may be read for host-side
+  register names, semantics and initialization tables. The PMU firmware
+  binaries shipped with those projects are never downloaded, opened or used.
+  Facts taken from them are labelled ``[public: <project> <file>]`` in this
+  documentation.
+
+* 2026-11-15 — the page summarising those public sources was **removed**:
+  the only use of public values (DDR4-PHY PLL registers, experiment
+  :exp:`005`) was refuted on the K3, and neither the training firmware nor the
+  U-Boot patch uses anything from public code; DevInit follows :dc:`07` and our
+  measurements only. The ``[public]`` evidence label is no longer used.
+
 * 2026-11-15 — while locating the boundaries of the vendor firmware arrays in
   ``lpddr5_pre_training_table.c`` to exclude them from the build, two commands
   printed a few bytes of those arrays (the first three entries of

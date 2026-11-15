@@ -18,6 +18,10 @@ The ``phypara`` order is generated from the appendix by
 ``tools/gen_phypara.py``; ``tests/test_phypara.c`` checks 5170 entries,
 segment 48 = ``0x9002e``–``0x9062d`` and that all indices are unique.
 
+Before training the ACSM SRAM holds random power-on data (different on each
+controller, almost no zeros); the SPL pre-training flow does not initialise it
+[:exp:`002`].
+
 Envelope ``DDRT`` (``0x9800`` bytes, CRC-32 over ``[0x08, 0x9800)``) lives in SPI
 ``bootinfo + 0x10000`` on the reference board. Our board's SPI is blank, so
 every boot is a full training; quickboot with our own envelopes comes last.

@@ -52,9 +52,12 @@ COMMON_SRC := src/arch/start.S src/hal/timer.c src/hal/mailbox.c \
 LIBCALLS := src/arch/libcalls.c
 
 PROBE_SRC := src/probe/main.c
+CSRDUMP_SRC := src/csrdump/main.c $(B)/gen/phypara_fw.c
+CSRSCAN_SRC := src/csrscan/main.c
+PLLPROBE_SRC := src/pllprobe/main.c
 TRAIN_SRC := $(wildcard src/train/*.c)
 
-FIRMWARES := probe train
+FIRMWARES := probe csrdump csrscan pllprobe train
 
 .PHONY: all check test fsbl docs clean
 all: $(foreach f,$(FIRMWARES),$(B)/$(f)/$(f).imem.bin)
@@ -70,12 +73,21 @@ $(B)/obj/%.o: src/%.c $(MSGBLK_H)
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -MMD -c $< -o $@
 
+$(B)/gen/phypara_fw.c: docsClean/appendix-phypara-order.md tools/gen_phypara.py
+	@mkdir -p $(dir $@)
+	$(PYTHON) tools/gen_phypara.py --fw $< $@
+
+$(B)/obj/gen/%.o: $(B)/gen/%.c
+	$(NEED_CC)
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -MMD -c $< -o $@
+
 $(B)/obj/%.o: src/%.S
 	$(NEED_CC)
 	@mkdir -p $(dir $@)
 	$(CC) $(ASFLAGS) -c $< -o $@
 
-obj = $(patsubst src/%,$(B)/obj/%.o,$(basename $(1)))
+obj = $(patsubst $(B)/gen/%,$(B)/obj/gen/%.o,$(patsubst src/%,$(B)/obj/%.o,$(basename $(1))))
 
 # libcalls.o is linked last and never with LTO (docsClean BR-07).
 define FW_RULES
@@ -89,6 +101,9 @@ $(B)/$(1)/$(1).imem.bin: $(B)/$(1)/$(1).elf tools/mkfw.py
 endef
 
 $(eval $(call FW_RULES,probe,$(PROBE_SRC)))
+$(eval $(call FW_RULES,csrdump,$(CSRDUMP_SRC)))
+$(eval $(call FW_RULES,csrscan,$(CSRSCAN_SRC)))
+$(eval $(call FW_RULES,pllprobe,$(PLLPROBE_SRC)))
 $(eval $(call FW_RULES,train,$(TRAIN_SRC)))
 
 check: all
@@ -99,7 +114,8 @@ check: all
 test: $(MSGBLK_H)
 	@$(MAKE) -C tests HOSTCC=$(HOSTCC) GEN=$(abspath $(B)/gen)
 
-FSBL_FRAG ?= $(if $(filter probe,$(FW)),configs/k3_freefw_probe.config,configs/k3_freefw.config)
+# experiment firmwares (anything but train) stop SPL after the PMU run
+FSBL_FRAG ?= $(if $(filter train,$(FW)),configs/k3_freefw.config,configs/k3_freefw_probe.config)
 
 fsbl: $(B)/$(FW)/$(FW).imem.bin
 	tools/build_fsbl.sh $(UBOOT_DIR) $(abspath $(B)/$(FW)/$(FW)) $(FSBL_FRAG)

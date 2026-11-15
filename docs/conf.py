@@ -15,7 +15,7 @@ language = "en"
 # the choice is remembered by the browser.
 extensions = ["sphinx_rtd_theme", "sphinx_rtd_dark_mode"]
 default_dark_mode = False
-exclude_patterns = ["_build", ".venv", "README.md", "requirements.txt"]
+exclude_patterns = ["_build", ".venv", "README.md", "questions.md", "requirements.txt"]
 
 # Read the Docs theme (same as docs.openmc.org)
 html_theme = "sphinx_rtd_theme"

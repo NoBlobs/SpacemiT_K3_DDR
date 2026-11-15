@@ -38,7 +38,8 @@ make -C "$UBOOT" "$@" olddefconfig >/dev/null
 make -C "$UBOOT" "$@" -j"$(nproc)"
 
 for o in K3_DDR_LPDDR4X K3_DDR_LP5_FREE_FW K3_DDR_LP5_FREE_FW_PREFIX \
-	K3_DDR_PMU_MBOX_LOG K3_DDR_PMU_MBOX_TIMEOUT_MS K3_DDR_PMU_STOP_AFTER_FW; do
+	K3_DDR_PMU_MBOX_LOG K3_DDR_PMU_MBOX_TIMEOUT_MS K3_DDR_PMU_STOP_AFTER_FW \
+	K3_DDR_PMU_HOST_DUMP K3_DDR_PMU_COMPARE_DUMP; do
 	grep -E "^(# )?CONFIG_$o[= ]" "$UBOOT/.config" || true
 done
 grep -q k3_free_fw_imem_table "$UBOOT/spl/u-boot-spl.map" ||

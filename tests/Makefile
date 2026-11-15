@@ -7,7 +7,7 @@ PYTHON ?= python3 -I
 OUT    := ../build/tests
 CFLAGS := -std=gnu11 -Wall -Wextra -Werror -O1 -g -I. -I../src -I$(GEN)
 
-TESTS := test_msgblk test_phypara
+TESTS := test_msgblk test_phypara test_phypara_fw test_devinit_calc
 
 .PHONY: all clean
 all: $(addprefix $(OUT)/,$(TESTS))
@@ -24,6 +24,17 @@ $(OUT)/test_msgblk: test_msgblk.c
 
 $(OUT)/test_phypara: test_phypara.c $(OUT)/phypara_order.c
 	$(HOSTCC) $(CFLAGS) $^ -o $@
+
+$(OUT)/phypara_fw.c: ../docsClean/appendix-phypara-order.md ../tools/gen_phypara.py
+	@mkdir -p $(OUT)
+	$(PYTHON) ../tools/gen_phypara.py --fw $< $@
+
+$(OUT)/test_phypara_fw: test_phypara_fw.c $(OUT)/phypara_fw.c $(OUT)/phypara_order.c
+	$(HOSTCC) $(CFLAGS) $^ -o $@
+
+$(OUT)/test_devinit_calc: test_devinit_calc.c ../src/train/devinit_calc.h
+	@mkdir -p $(OUT)
+	$(HOSTCC) $(CFLAGS) $< -o $@
 
 clean:
 	rm -rf ../build/tests

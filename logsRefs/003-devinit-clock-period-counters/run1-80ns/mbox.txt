@@ -1,0 +1,16 @@
+    17410337 PMU0 major 0x30 train start
+    17411322 PMU0 major 0x40 stage bit 0
+    17413173 PMU0 major 0x08 STREAM
+    17418638 PMU0 DEVINIT_STATE: 0xc0086=0x1 0x100a3=0xb33 0x20060=0x2
+    17419697 PMU0 major 0x08 STREAM
+    17430805 PMU0 DEVINIT_CAL: ctrl=0x6f trig0=0x0 tca0=0x0 tdq0=0x0 tca=0x0(0) tdq=0x0(0) val=0 n=0 bucket=0x0 ab=0x0
+    17431863 PMU0 major 0x08 STREAM
+    17436536 PMU0 STAGE: bit=0 status=1
+    22361221 PMU1 major 0x30 train start
+    22362229 PMU1 major 0x40 stage bit 0
+    22364081 PMU1 major 0x08 STREAM
+    22369546 PMU1 DEVINIT_STATE: 0xc0086=0x1 0x100a3=0xb33 0x20060=0x2
+    22370604 PMU1 major 0x08 STREAM
+    22381712 PMU1 DEVINIT_CAL: ctrl=0x6f trig0=0x0 tca0=0x0 tdq0=0x0 tca=0x0(0) tdq=0x0(0) val=0 n=0 bucket=0x0 ab=0x0
+    22382770 PMU1 major 0x08 STREAM
+    22387443 PMU1 STAGE: bit=0 status=1

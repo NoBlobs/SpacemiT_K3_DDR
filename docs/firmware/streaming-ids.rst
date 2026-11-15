@@ -20,4 +20,23 @@ ID         Name                  Payload
 ``0x0813`` ``PROBE_DMEM``        ``offset << 16 | halfword``; last frame: byte reads
 ``0x0814`` ``PROBE_MEM``         IMEM ``ldh`` @0, ``ldh`` @0x1fc, ``ld`` @0
 ``0x0815`` ``PROBE_ISA``         self-test results (see ``src/probe/main.c``)
+``0x0820`` ``CSRDUMP``           phypara count, non-zero, CRC; ACSM count, non-zero, CRC; ticks phypara, ticks ACSM
+``0x0821`` ``CSRSCAN``           first index, count, packed halfwords
+``0x0822`` ``PLLPROBE``          tag, time µs, packed register values
+``0x0830`` ``DEVINIT_CAL``       b03a788 calibration values (exp 006, retired)
+``0x0831`` ``DEVINIT_STATE``     b03a788 phase state (exp 006, retired)
+``0x0832`` ``DEVINIT_WATCH``     ticks, ``0x300bf``, ``0x100e0``, ``0x100d5`` (exp 006)
+``0x0833`` ``DEVINIT_DMEM``      (ARC address, halfword) pairs (exp 006)
+``0x0834`` ``DEVINIT_INPUT``     message-block inputs, ``0xc0080``, rank count
+``0x0835`` ``DEVINIT_ACSM``      tag, poll iterations, final ``0x20021``
+``0x0836`` ``DEVINIT_CAL2``      ``e3``, ``e5``, counters before, ``e3`` high, latched counters, ``0x100d5``, ``f_lo``, ``f_hi``, buckets
+``0x0837`` ``DEVINIT_STATE2``    tag, µs, ``0xc0086``, ``0x20011``, ``0x20060``, calibration registers, ``0x100d5``, ``0x100a3``
+``0x0838`` ``DEVINIT_LATCH``     tag, wait (exp 007) or ``0x200a2`` (exp 008), ``e3``, ``e5``, counters before and after a test latch
+``0x0839`` ``DEVINIT_REGS``      tag, µs, step 3.5 registers (exp 007)
+``0x083a`` ``DEVINIT_PHASE0``    canary DMEM/registers before and after, multiplier, ``0x8000040c``
+``0x083b`` ``DEVINIT_DESC``      descriptor index, CSR, value, replaced flag
+``0x083c`` ``DEVINIT_DQCAL``     rank, k, ``d5`` before, lane 0 ``d0``–``d4``, ``d5`` now
+``0x083d`` ``DEVINIT_ACSMTRY``   tag, ``0x20021`` before/start/poll, polls, after stop (exp 008)
+``0x083e`` ``DEVINIT_DQCAL2``    rank, ``d5``, ``k`` per lane (3 bits each), fallbacks, ``0x01r0ad``
+``0x083f`` ``DEVINIT_PHASE0B``   version code, canary DMEM, ``0xc00ee``, branch, read-back, multiplier, pair
 ========== ===================== ==========================================

@@ -51,6 +51,7 @@ static int validate(struct train_ctx *c)
 	c->dq_b = MB_GET(EnabledDQsChB);
 	c->x8 = x8;
 	c->freq = freq;
+	c->pstate = MB_GET(Pstate);
 
 	if (!(c->seq & SEQ_DEVINIT) || (c->seq & SEQ_RESERVED))
 		return 1;
@@ -70,6 +71,7 @@ int main(void)
 	struct train_ctx ctx = { 0 };
 	uint32_t boot[3] = { FW_ID_TRAIN, TRAIN_VERSION, 0 };
 	unsigned int i;
+	uint32_t incomplete = 0;
 	int err;
 
 	timer_init();
@@ -83,6 +85,12 @@ int main(void)
 		fw_fatal();
 	}
 
+	/*
+	 * Every enabled stage runs in order. A stage that is not (fully)
+	 * implemented is reported and the run continues, so experiments see
+	 * the effect of the implemented parts; the run then ends with 0xff so
+	 * the host never activates the DDRC on an incompletely trained PHY.
+	 */
 	for (i = 0; i < sizeof(stages) / sizeof(stages[0]); i++) {
 		enum train_status st;
 
@@ -90,9 +98,15 @@ int main(void)
 			continue;
 		mbox_major(MAJOR_STAGE_BASE + stages[i].bit);
 		st = stages[i].run(&ctx);
-		log_words(HDT_STAGE, LOG_ID_STAGE, 2, stages[i].bit, st);
-		if (st != TRAIN_OK)
+		log_words(0, LOG_ID_STAGE, 2, stages[i].bit, st);
+		if (st == TRAIN_FAIL)
 			fw_fatal();
+		if (st != TRAIN_OK)
+			incomplete |= 1u << stages[i].bit;
+	}
+	if (incomplete) {
+		log_words(0, LOG_ID_ASSERT, 2, (uint32_t)__LINE__, incomplete);
+		fw_fatal();
 	}
 	fw_done();
 }

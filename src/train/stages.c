@@ -10,7 +10,6 @@
 		return TRAIN_NOT_IMPLEMENTED; \
 	}
 
-STUB(stage_devinit)
 STUB(stage_wrlvl)
 STUB(stage_rxen)
 STUB(stage_rddqs)

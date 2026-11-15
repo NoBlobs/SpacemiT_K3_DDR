@@ -18,9 +18,15 @@ Kconfig (``drivers/ddr/spacemit/k3/Kconfig``)
 ``K3_DDR_PMU_STOP_AFTER_FW``
    experiments: run the PMU on both controllers, stop it, print the elapsed
    time and ``hang()`` without activating the DDRC.
+``K3_DDR_PMU_COMPARE_DUMP``
+   with the ``csrdump`` firmware: after the PMU stops, run the normal result
+   collection, compare ``phypara``/ACSM with the PMU's copy at DMEM index
+   ``0x5c000`` and print every host value (``PMU<n> P``/``A`` lines, extracted by
+   ``tools/dump_extract.py``).
 
-Fragments: ``configs/k3_freefw.config`` (training) and
-``configs/k3_freefw_probe.config`` (probe experiments).
+Fragments: ``configs/k3_freefw.config`` (training),
+``configs/k3_freefw_probe.config`` (probe experiments) and
+``configs/k3_freefw_csrdump.config`` (CSR read-out comparison).
 
 Code changes
 ------------
