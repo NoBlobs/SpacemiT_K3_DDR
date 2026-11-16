@@ -7,7 +7,7 @@ PYTHON ?= python3 -I
 OUT    := ../build/tests
 CFLAGS := -std=gnu11 -Wall -Wextra -Werror -O1 -g -I. -I../src -I$(GEN)
 
-TESTS := test_msgblk test_phypara test_phypara_fw test_devinit_calc
+TESTS := test_msgblk test_phypara test_phypara_fw test_devinit_calc test_eye
 
 .PHONY: all clean
 all: $(addprefix $(OUT)/,$(TESTS))
@@ -33,6 +33,10 @@ $(OUT)/test_phypara_fw: test_phypara_fw.c $(OUT)/phypara_fw.c $(OUT)/phypara_ord
 	$(HOSTCC) $(CFLAGS) $^ -o $@
 
 $(OUT)/test_devinit_calc: test_devinit_calc.c ../src/train/devinit_calc.h
+	@mkdir -p $(OUT)
+	$(HOSTCC) $(CFLAGS) $< -o $@
+
+$(OUT)/test_eye: test_eye.c ../src/train/eye.h
 	@mkdir -p $(OUT)
 	$(HOSTCC) $(CFLAGS) $< -o $@
 

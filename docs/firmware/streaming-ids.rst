@@ -37,6 +37,9 @@ ID         Name                  Payload
 ``0x083b`` ``DEVINIT_DESC``      descriptor index, CSR, value, replaced flag
 ``0x083c`` ``DEVINIT_DQCAL``     rank, k, ``d5`` before, lane 0 ``d0``–``d4``, ``d5`` now
 ``0x083d`` ``DEVINIT_ACSMTRY``   tag, ``0x20021`` before/start/poll, polls, after stop (exp 008)
-``0x083e`` ``DEVINIT_DQCAL2``    rank, ``d5``, ``k`` per lane (3 bits each), fallbacks, ``0x01r0ad``
+``0x083e`` ``DEVINIT_DQCAL2``    retired (lane loop, exp 009)
 ``0x083f`` ``DEVINIT_PHASE0B``   version code, canary DMEM, ``0xc00ee``, branch, read-back, multiplier, pair
+``0x0840`` ``DEVINIT_DQCAL3``    rank, ``d5``, ``d0``–``d4``, ``0x01r0ad``, ``0x01r0af``
+``0x0841`` ``DEVINIT_END``       ``0xc0086``, ``0x20060``, ``0x20011``, ``0x2000a``, ``0x20187``
+``0x0842`` ``QB_DLL``            quickboot step 6: ``0x20009``, ``0x20049``, ``0x200cf``, ``0x2004e``, ``0x0100ad/af``, ``0x2000a``, ``0x20060``
 ========== ===================== ==========================================

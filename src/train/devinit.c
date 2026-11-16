@@ -12,12 +12,13 @@
  *   phase 3  3.1 QBPll read-back and the 0x800004cc descriptors,
  *            3.2 0x2008b/0x20072/0x20073, 3.3 0x20011 and 0x01<r>0a3,
  *            3.4 DQ block reset, 3.5 DRAM reset / PLL sequencing,
- *            3.6 per-rank DQ calibration (result in 0x01<r>0ad),
+ *            3.6 per-rank DQ calibration (0x01<r>0ad, 0x01<r>0af),
  *            3.7 period latch and frequency buckets;
  *   phase 6  6.1 ACSM dividers and one-shot NOP flush, block disable;
  *            6.2 MemResetL release and the one-shot MRW burst;
- *            6.3 lane state, channel commit, 0x01<r>0a3 restore, 0x000a4.
- * Not implemented: the ZQ calibration MPC burst of step 6.2 (question J2).
+ *            6.3 lane state, channel commit, 0x2006e = 0, restore of 0x20011,
+ *                0x01<r>0a3, 0x20072/73 and 0x90808/13, 0x000a4.
+ *            6.2 also sends the ZQ calibration MPC burst (variant 1).
  *
  * Delays follow the two-tier model of docsClean/07: delay_dfi_clks(n) waits
  * (n + 1) >> shift RTC ticks (one dummy read below 16), delay_ps_or_clks()
@@ -58,7 +59,6 @@
 #define CSR_ACSM_BURST	0x20041u	/* + pstate */
 #define ACSM_SRAM_ARC	0x90082000u
 #define ACSM_POLL_MAX	25000u
-#define ACSM_NOP_HW3	0x2b00u		/* fixed 2-unit inter-MRW spacing */
 
 /* group 0x01 rank r register xx, lane l, and the write-only all-rank alias */
 #define RANK_CSR(r, xx)		(0x10000u | ((uint32_t)(r) << 12) | (xx))
@@ -79,8 +79,9 @@ struct devinit {
 	uint8_t mult_en;	/* byte[0x80000a80] */
 	uint8_t nranks;		/* word[0x8000040c] */
 	uint8_t ver;		/* byte[0x80000403], PHY IP version code */
-	int dram_init;		/* Quickboot == 0 && byte[0] bit 7 == 0 */
+	int dram_init;		/* Quickboot == 0 && MsgMisc[7] == 0 */
 	uint16_t a3[MAX_RANKS];	/* DMEM 0x80000430 + 2r in the reference */
+	uint16_t cal_ctrl;	/* 0x20011 saved in step 3.3 (DMEM 0x8000042a) */
 	uint64_t t0;
 };
 
@@ -189,7 +190,7 @@ static int devinit_phase0(struct devinit *d)
 	uint16_t m_lo = rd16(0x80000424), m_hi = rd16(0x80000426);
 	uint16_t ee = csr_rd(0xc00ee);
 	uint32_t lo_idx;
-	int branch = mb_rd8(0x001) & 0x01;	/* byte[0x80000001] bit 0 (question J1) */
+	int branch = MB_GET(MsgMisc) & 0x01;	/* MsgMisc[0] */
 	uint16_t r_lo, r_hi;
 
 	csr_wr(0x20090, 1);
@@ -342,67 +343,75 @@ static void dram_reset_pll(struct devinit *d)
 	pll_tail(d);
 }
 
+/* Pulse bit 0 of 0x01r0ac. */
+static void pulse_0ac(unsigned int r)
+{
+	uint16_t v = csr_rd(RANK_CSR(r, 0x0ac));
+
+	csr_wr(RANK_CSR(r, 0x0ac), v | 1);
+	csr_wr(RANK_CSR(r, 0x0ac), (uint16_t)(v & ~1u));
+}
+
+/* Gate pulse around a rank-calibration latch (r = 0xf: broadcast, read from rank 0). */
+static void dq_gate_latch(struct devinit *d, unsigned int r, uint32_t gate, uint16_t gbit)
+{
+	unsigned int rr = r == 0xf ? 0 : r;
+
+	csr_wr(RANK_CSR(r, gate), (uint16_t)(csr_rd(RANK_CSR(rr, gate)) | gbit));
+	csr_wr(RANK_CSR(r, 0x00f) + d->ps,
+	       (uint16_t)((csr_rd(RANK_CSR(rr, 0x00f) + d->ps) & ~3u) | 1u));
+	delay_dfi_clks(d, ((uint32_t)(csr_rd(RANK_CSR(rr, 0x014) + d->ps) << 1) & 0x01feu) * 160u + 160u);
+	csr_wr(RANK_CSR(r, gate), (uint16_t)(csr_rd(RANK_CSR(rr, gate)) & ~gbit));
+	csr_wr(RANK_CSR(r, 0x00f) + d->ps, (uint16_t)(csr_rd(RANK_CSR(rr, 0x00f) + d->ps) & ~1u));
+}
+
 /*
- * Step 3.6 — per-rank DQ calibration (docsClean/07 19ab858). The channel bits
- * cleared in 0x01f002 + rank are restored at the end (not stated, question J3).
+ * Step 3.6 — per-rank DQ calibration (docsClean/07 8aa6257): one capture per
+ * rank (sub-block 0, no lane loop), result in 0x01r0ad, 0x01r0d6 -> 0x01r0af.
  */
 static void dq_rank_cal(struct devinit *d)
 {
-	uint16_t old_0f, old_ac, d5, v, saved02[MAX_RANKS], dd[5];
-	unsigned int r, l, k, sel, fallback, tol;
-	uint32_t ks;
+	uint16_t dd[5], d5, gbit;
+	uint32_t gate;
+	unsigned int r, k, sel;
 
 	if (d->c->freq < 1600)
 		return;
-	old_0f = csr_rd(RANK_CSR(0, 0x00f) + d->ps);
-	old_ac = csr_rd(RANK_CSR(0, 0x0ac) + d->ps);
-	csr_wr(BCAST_CSR(0x0d9), 0x1000);
-	csr_wr(BCAST_CSR(0x00f) + d->ps, (uint16_t)((old_0f & 0xfff8) | 0x0006));
-	for (r = 0; r < d->nranks; r++) {
-		saved02[r] = csr_rd(0x10002u + r);
-		csr_wr(0x1f002u + r, (uint16_t)(saved02[r] & ~(r < 2 ? 1u : 2u)));
+	if (d->ver >= 4) {
+		gate = 0x057u + d->ps;
+		gbit = 1;
+	} else {
+		gate = d->ver >= 2 ? 0x056u : 0x014u + d->ps;
+		gbit = 2;
 	}
-	csr_wr(BCAST_CSR(0x0ac) + d->ps, (uint16_t)(old_ac & 0xfffe));
+
+	csr_wr(BCAST_CSR(0x0d9), 0x1000);
+	csr_wr(BCAST_CSR(0x00f) + d->ps,
+	       (uint16_t)((csr_rd(RANK_CSR(0, 0x00f) + d->ps) & 0xfff8) | 0x0006));
+	csr_wr(BCAST_CSR(gate), (uint16_t)(csr_rd(RANK_CSR(0, gate)) & ~gbit));
+	csr_wr(BCAST_CSR(0x0ac), (uint16_t)(csr_rd(RANK_CSR(0, 0x0ac)) & ~1u));
 	csr_wr(BCAST_CSR(0x00f) + d->ps, (uint16_t)(csr_rd(RANK_CSR(0, 0x00f) + d->ps) | 0x0005));
 	delay_dfi_clks(d, 0x3000);
 	csr_wr(BCAST_CSR(0x00f) + d->ps,
-	       (uint16_t)((csr_rd(RANK_CSR(0, 0x00f) + d->ps) & 0xfffa) | 0x0004));
+	       (uint16_t)((csr_rd(RANK_CSR(0, 0x00f) + d->ps) & ~0x0005u) | 0x0004));
 
 	for (r = 0; r < d->nranks; r++) {
-		ks = 0;
-		fallback = 0;
-		d5 = 0;
-		for (l = 0; l <= 8; l++) {
-			for (k = 0; k < 5; k++)
-				dd[k] = csr_rd(LANE_CSR(r, l, 0x0d0 + k));
-			v = csr_rd(RANK_CSR(r, 0x0ac));
-			csr_wr(RANK_CSR(r, 0x0ac), v | 1);
-			csr_wr(RANK_CSR(r, 0x0ac), (uint16_t)(v & ~1u));
-			d5 = csr_rd(RANK_CSR(r, 0x0d5));
-			tol = d5 * 14u / 100u;
-			sel = 5;
-			for (k = 0; k < 4; k++) {
-				uint16_t delta = (uint16_t)(dd[k + 1] - dd[k]);
-				unsigned int diff = delta > d5 ? delta - d5 : d5 - delta;
-
-				if (dd[k] > 0 && diff <= tol) {
-					sel = k;
-					break;
-				}
-			}
-			if (sel == 5)
-				fallback++;
-			ks |= (uint32_t)sel << (3 * l);
-			csr_wr(RANK_CSR(r, 0x0ad), (uint16_t)sel);
-		}
-		log_words(0, LOG_ID_DEVINIT_DQCAL2, 5, r, d5, ks, fallback, csr_rd(RANK_CSR(r, 0x0ad)));
+		for (k = 0; k < 5; k++)
+			dd[k] = csr_rd(RANK_CSR(r, 0x0d0 + k));
+		pulse_0ac(r);
+		d5 = csr_rd(RANK_CSR(r, 0x0d5));
+		sel = dq_step_select(dd, d5);
+		csr_wr(RANK_CSR(r, 0x0ad), (uint16_t)sel);
+		dq_gate_latch(d, r, gate, gbit);
+		pulse_0ac(r);
+		csr_wr(RANK_CSR(r, 0x0af), csr_rd(RANK_CSR(r, 0x0d6)));
+		log_words(0, LOG_ID_DEVINIT_DQCAL3, 7, r, d5,
+			  ((uint32_t)dd[0] << 16) | dd[1], ((uint32_t)dd[2] << 16) | dd[3], dd[4],
+			  csr_rd(RANK_CSR(r, 0x0ad)), csr_rd(RANK_CSR(r, 0x0af)));
 	}
-	delay_dfi_clks(d, ((csr_rd(RANK_CSR(d->nranks - 1, 0x014)) & 0x01fe) + 4u) * 160u);
-	csr_wr(BCAST_CSR(0x00f) + d->ps, old_0f);
-	csr_wr(BCAST_CSR(0x0ac) + d->ps, old_ac);
-	for (r = 0; r < d->nranks; r++)
-		csr_wr(0x1f002u + r, saved02[r]);
+	dq_gate_latch(d, 0xf, gate, gbit);
 }
+
 /* Step 3.7 — master clock-period calibration and frequency buckets. */
 static enum train_status clock_period(struct devinit *d, uint16_t *tca)
 {
@@ -462,7 +471,8 @@ static enum train_status devinit_phase3(struct devinit *d, uint16_t *tca)
 	csr_wr(0x20073, d->c->cs_b);
 	/* 3.3 */
 	if (!MB_GET(Quickboot)) {
-		csr_wr(CSR_CAL_CTRL, csr_rd(CSR_CAL_CTRL) & 0xff9f);
+		d->cal_ctrl = csr_rd(CSR_CAL_CTRL + d->ps);
+		csr_wr(CSR_CAL_CTRL + d->ps, d->cal_ctrl & 0xff9f);
 		for (i = 0; i < d->nranks; i++)
 			d->a3[i] = csr_rd(RANK_CSR(i, 0x0a3));
 		for (i = 0; i < d->nranks; i++)
@@ -525,13 +535,24 @@ static void acsm_put(uint16_t *cur, uint16_t h0, uint16_t h1, uint16_t h2, uint1
 	*cur = (uint16_t)(*cur + 4);
 }
 
+/* NOP pair with repeat count r (r + 1 units), docsClean/07 8aa6257. */
+static void acsm_nop(uint16_t *cur, unsigned int r)
+{
+	while (r > 255) {
+		acsm_put(cur, 0, 0, 0, acsm_nop_hw3(255));
+		acsm_put(cur, 0, 0, 0, acsm_nop_hw7(255));
+		r -= 255;
+	}
+	acsm_put(cur, 0, 0, 0, acsm_nop_hw3(r));
+	acsm_put(cur, 0, 0, 0, acsm_nop_hw7(r));
+}
+
 /* One MRW (MRW-1, MRW-2) followed by the fixed NOP pair. */
 static void acsm_mrw(uint16_t *cur, unsigned int cs, unsigned int ma, unsigned int op)
 {
 	acsm_put(cur, acsm_mrw1(cs, ma), 0, 0, 0);
 	acsm_put(cur, acsm_mrw2(cs, op), 0, 0, 0);
-	acsm_put(cur, 0, 0, 0, ACSM_NOP_HW3);
-	acsm_put(cur, 0, 0, 0, 0);
+	acsm_nop(cur, acsm_nop_count(17, 8));	/* fixed inter-MRW spacing (0x2b00) */
 }
 
 static void channel_commit(const struct devinit *d)
@@ -554,8 +575,7 @@ static int devinit_phase6_1(struct devinit *d)
 		csr_wr(0x9080c, csr_rd(0x9080c) & 0xff9f);
 	}
 	acsm_reset_ptr(d, &cur);
-	acsm_put(&cur, 0, 0, 0, 0);
-	acsm_put(&cur, 0, 0, 0, 0);
+	acsm_nop(&cur, acsm_nop_count(4, 1));	/* 4-unit NOP flush */
 	rc = acsm_oneshot(d, cur, 0x61);
 
 	delay_dfi_clks(d, 0x1f);
@@ -572,10 +592,10 @@ static int devinit_phase6_2(struct devinit *d)
 {
 	static const uint8_t order[] = { 19, 18, 1, 2, 3, 10, 11, 17, 12, 14, 15, 16,
 					 20, 22, 24, 37, 40, 41 };
-	int fast = mb_rd8(0x001) & 0x02;	/* byte[0x80000001] bit 1 (question J1) */
+	int fast = MB_GET(MsgMisc) & 0x02;	/* MsgMisc[1]: fast tINIT */
 	uint16_t cur;
 	unsigned int i, r;
-	int rc;
+	int rc, zq;
 
 	if (!d->dram_init)
 		return 0;
@@ -592,8 +612,7 @@ static int devinit_phase6_2(struct devinit *d)
 	csr_wr(0x2002a, 1);
 	csr_wr(CSR_ACSM_BURST + d->ps, 1);
 	acsm_reset_ptr(d, &cur);
-	acsm_put(&cur, 0, 0, 0, 0);
-	acsm_put(&cur, 0, 0, 0, 0);
+	acsm_nop(&cur, 0);			/* 1-unit NOP */
 	for (i = 0; i < sizeof(order); i++) {
 		unsigned int ma = order[i];
 		uint32_t off = mr_offset(ma);
@@ -608,7 +627,28 @@ static int devinit_phase6_2(struct devinit *d)
 				acsm_mrw(&cur, 1u << r, ma, mb_rd8(off + r));
 	}
 	rc = acsm_oneshot(d, cur, 0x62);
-	/* ZQ calibration MPC burst: entry encoding not specified (question J2) */
+
+	/* ZQ calibration MPC burst (step 6.2.5) */
+	acsm_reset_ptr(d, &cur);
+	if (!(MB_GET(MsgMisc) & 0x08)) {
+		/* variant 1 (byte[0x80000a80] == 1 is fixed in phase 2) */
+		acsm_nop(&cur, acsm_nop_count(5, 1));
+		acsm_put(&cur, acsm_mpc25_hw0(0x0f, 0x86), 0, 0, acsm_cs_hw3(0x0f));
+		acsm_put(&cur, acsm_mpc26_hw0(0, 0x86), 0, 0, acsm_cs_hw3(0));
+		acsm_nop(&cur, acsm_nop_count(16, 1));
+		acsm_nop(&cur, acsm_nop_count(16, 1));
+		acsm_nop(&cur, acsm_nop_count(1, 1));
+		acsm_nop(&cur, acsm_nop_count(10, 1));
+		zq = acsm_oneshot(d, cur, 0x65);
+	} else {
+		/* variant 0: single MPC (cmd 0x19) */
+		acsm_put(&cur, (uint16_t)((3u << 14) | (0x06u << 7) | 0x40u | 0x30u), 0, 0, acsm_cs_hw3(3));
+		acsm_put(&cur, 0, 0, 0, 0);
+		zq = acsm_oneshot(d, cur, 0x65);
+		delay_ps_or_clks(d, 30000, 0x1e);
+	}
+	if (zq)
+		rc = zq;
 	csr_wr(CSR_ACSM_BURST + d->ps, 0);
 	csr_wr(BCAST_CSR(0x00a), 0);
 	channel_commit(d);
@@ -626,11 +666,141 @@ static void devinit_phase6_3(struct devinit *d)
 	csr_wr(0x20042, (uint16_t)(d->mult | 0x0100));
 	csr_wr(0x20044, d->ratio == 2 ? 3 : 2);
 	channel_commit(d);
-	if (!MB_GET(Quickboot))
+	csr_wr(0x2006e, 0);
+	if (!MB_GET(Quickboot)) {
+		csr_wr(CSR_CAL_CTRL + d->ps, d->cal_ctrl);
 		for (r = 0; r < d->nranks; r++)
 			csr_wr(RANK_CSR(r, 0x0a3), d->a3[r]);
+		csr_wr(0x20072, d->c->cs_a);
+		csr_wr(0x20073, d->c->cs_b);
+		if (d->ver >= 8) {
+			csr_wr(0x90808, (uint16_t)((csr_rd(0x20314) << 8) | 1));
+			csr_wr(0x90813, (uint16_t)((csr_rd(0x20315) << 8) | 1));
+		}
+	}
 	csr_wr(0x000a4, 1);
 	report_state(d, 0x63);
+}
+
+/*
+ * Quickboot (Quickboot != 0) — docsClean/11 "quickboot PMU internal execution
+ * sequence" (066c550), hardware part only. The host writes the saved phypara
+ * before the PMU starts (Pass 1 and 2, and Pass 3 early, which docsClean
+ * allows) and re-applies Pass 3 and 0x90808/13 after the PMU halts. No period
+ * calibration, no step 3.6, no 0x01<r>0a3 mask, no tINIT wait.
+ */
+static int qb_mrw(struct devinit *d)
+{
+	static const uint8_t order[] = { 19, 18, 1, 2, 3, 10, 11, 17, 12, 14, 15, 16,
+					 20, 22, 24, 37, 40, 41 };
+	uint16_t cur;
+	unsigned int i, r;
+	int rc;
+
+	csr_wr(0x3f084, 0);
+	csr_wr(BCAST_CSR(0x00a), 0);
+	csr_wr(0x2002a, 1);
+	csr_wr(CSR_ACSM_BURST + d->ps, 1);
+	acsm_reset_ptr(d, &cur);
+	acsm_nop(&cur, 0);
+	for (i = 0; i < sizeof(order); i++) {
+		unsigned int ma = order[i];
+		uint32_t off = mr_offset(ma);
+		int per_rank = ma == 17 || ma == 12 || ma == 14 || ma == 15 || ma == 24;
+
+		if (!per_rank) {
+			acsm_mrw(&cur, 3, ma, mb_rd8(off));
+			continue;
+		}
+		for (r = 0; r < 2; r++)
+			if (d->c->cs_a & (1u << r))
+				acsm_mrw(&cur, 1u << r, ma, mb_rd8(off + r));
+	}
+	rc = acsm_oneshot(d, cur, 0x72);
+	csr_wr(CSR_ACSM_BURST + d->ps, 0);
+	csr_wr(BCAST_CSR(0x00a), 0);
+	channel_commit(d);
+	return rc;
+}
+
+/* docsClean/11 step 6 — hardware DLL / clock recalibration. */
+static void qb_dll_recal(struct devinit *d, uint16_t r20009)
+{
+	uint16_t u = csr_rd(0x20049) & 0x01f0;
+
+	delay_ps_or_clks(d, 0, 0x40);		/* multiplier off: 65 ticks */
+	csr_wr(0x2f310, 1);
+	csr_wr(0x2f0f8, 1);
+	if (!MB_GET(PllBypassEn)) {
+		csr_wr(0x2f049, u | 0x0400);
+		delay_ps_or_clks(d, 1000u, 0);
+		csr_wr(0x2f0e0, 1);
+		delay_ps_or_clks(d, 1000000u, 0);
+		csr_wr(0x2f049, u | 0x0200);
+		csr_wr(0x2f0c3, 1);
+		csr_wr(0x2f0e0, 0);
+		csr_wr(0x2004e + d->ps, csr_rd(0x200cf) & 0x001f);
+	} else {
+		csr_wr(0x2f0c3, 1);
+	}
+	csr_wr(d->ver ? 0x9f02du : 0x9f028u, 1);	/* level, never cleared */
+	csr_wr(0x2f009 + d->ps, r20009);
+	log_words(0, LOG_ID_QB_DLL, 8, r20009, csr_rd(0x20049), csr_rd(0x200cf),
+		  csr_rd(0x2004e + d->ps), csr_rd(RANK_CSR(0, 0x0ad)), csr_rd(RANK_CSR(0, 0x0af)),
+		  csr_rd(CSR_TCA + d->ps), csr_rd(CSR_MEMRESETL));
+}
+
+static enum train_status quickboot_run(struct devinit *d)
+{
+	static const uint32_t qbpll_csr[7] = {
+		0x20088, 0x20089, 0x2008a, 0x2008c, 0x2004a, 0x2004b, 0x2004c,
+	};
+	uint16_t r20009;
+	unsigned int i;
+	int flush_ok, mrw_ok;
+
+	/* step 1: phase 0, commit strobe and canary (as DevInit), 0x20009 */
+	if (devinit_phase0(d))
+		return TRAIN_FAIL;
+	d->shift = delay_shift(csr_rd(CSR_UCCLK));
+	r20009 = csr_rd(0x20009);
+	/*
+	 * QBPll: the reference loads 0x20088..8c / 0x2004a..4c from message
+	 * 0x130..0x13d; here the host already wrote the saved phypara values.
+	 * Log both and keep the CSRs.
+	 */
+	for (i = 0; i < 7; i++)
+		log_words(0, LOG_ID_PROBE_CSR, 4, qbpll_csr[i], csr_rd(qbpll_csr[i]),
+			  0x58000u + ((MB_QBPllUPllProg0 + 2 * i) >> 1),	/* message halfword */
+			  mb_rd16(MB_QBPllUPllProg0 + 2 * i));
+	report_state(d, 0x71);
+
+	/* step 4: startup script, 0x2008b, 0x20072/73 (no 0x01r0a3 mask), DQ block reset */
+	csr_wr(0x2006e, 1);
+	csr_wr(0x70060, 0);
+	csr_wr(0x70011, 0);
+	csr_wr(0x2008b, (d->pstate & 0x80) ? 0 : (d->pstate & 1));
+	csr_wr(0x20072, d->c->cs_a);
+	csr_wr(0x20073, d->c->cs_b);
+	devinit_phase1(d);			/* reference clock, 0x200f8 = 1 */
+	dq_block_reset(d);
+
+	/* step 5: DRAM reset / PLL sequencing with lock wait, clock switch */
+	dram_reset_pll(d);
+	flush_ok = !devinit_phase6_1(d);	/* ACSM flush; 0x200f8 = 0, PLL clock */
+
+	/* no tINIT; multiplier off before MRW */
+	d->mult_en = 0;
+	mrw_ok = !qb_mrw(d);
+	csr_wr(0x2006e, 0);
+	report_state(d, 0x75);
+
+	/* step 6 */
+	qb_dll_recal(d, r20009);
+	commit_strobe();
+	csr_wr(0x000a4, 1);
+	report_state(d, 0x76);
+	return flush_ok && mrw_ok ? TRAIN_OK : TRAIN_PARTIAL;
 }
 
 enum train_status stage_devinit(struct train_ctx *c)
@@ -645,7 +815,7 @@ enum train_status stage_devinit(struct train_ctx *c)
 	d.ps = d.pstate & 0x0f;
 	d.ratio = MB_GET(DfiFreqRatio);
 	d.shift = 1;
-	d.dram_init = !MB_GET(Quickboot) && !(mb_rd8(0x000) & 0x80);
+	d.dram_init = !MB_GET(Quickboot) && !(MB_GET(MsgMisc) & 0x80);
 	d.nranks = (uint8_t)((c->cs_a & 1) + ((c->cs_a >> 1) & 1) +
 			     (c->cs_b & 1) + ((c->cs_b >> 1) & 1));
 	if (!d.nranks)
@@ -657,6 +827,8 @@ enum train_status stage_devinit(struct train_ctx *c)
 		  MB_GET(PllBypassEn), c->freq, d.ratio, MB_GET(Quickboot), c->cs_a, c->cs_b,
 		  csr_rd(CSR_UCCLK), d.nranks);
 	report_state(&d, 0x00);
+	if (MB_GET(Quickboot))
+		return quickboot_run(&d);
 	if (devinit_phase0(&d))
 		return TRAIN_FAIL;
 	devinit_phase1(&d);
@@ -669,6 +841,8 @@ enum train_status stage_devinit(struct train_ctx *c)
 	flush_ok = !devinit_phase6_1(&d);
 	mrw_ok = !devinit_phase6_2(&d);
 	devinit_phase6_3(&d);
+	log_words(0, LOG_ID_DEVINIT_END, 5, csr_rd(0xc0086), csr_rd(CSR_MEMRESETL),
+		  csr_rd(0x20011), csr_rd(0x2000a), csr_rd(0x20187));
 
 	/* period latched (not the seed, not saturated) and both ACSM runs done */
 	if ((tca & 0x01ff) != 0x0040 && (tca & 0x01ff) != 0x01ff && flush_ok && mrw_ok)

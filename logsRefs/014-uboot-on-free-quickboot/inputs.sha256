@@ -1,0 +1,5 @@
+2599f053ecb9f81fc8d992d17d3e5d129536b4c6a0c5e1139f46f4591bbec34f  build/envelope/ref6400-fdl-e1.bin
+a768628732e85e24b7bc1579eb70ad84d2517769b1070ee04c106f1d84f0f0f3  build/train/train.imem.bin
+56898b6b37f607b8994f85a5db153d21a1b7b2c75fe15b8794e65a1d9b363cf6  build/train/train.dmem.bin
+c383e2d0bcde66d571c2c5b1d6f243892cda3d882243eca254de9886dc1b0081  build/fsbl-env/FSBL-qb-e1-boot.bin
+ca6f303c764808e925976a257a1980cd12a86819df9b123298fba08259ff9575  build/fsbl-env/u-boot-qb-e1-boot.itb

@@ -39,8 +39,11 @@
 #define LOG_ID_DEVINIT_DESC	0x083b	/* index, csr, value, replaced */
 #define LOG_ID_DEVINIT_DQCAL	0x083c	/* rank, k, d5 before, lane 0 d0..d4, d5 now */
 #define LOG_ID_DEVINIT_ACSMTRY	0x083d	/* tag, busy before/after start/after poll, polls, after stop */
-#define LOG_ID_DEVINIT_DQCAL2	0x083e	/* rank, d5, k per lane (3 bits each), fallbacks, 0x01r0ad */
+#define LOG_ID_DEVINIT_DQCAL2	0x083e	/* retired (lane loop, experiment 009) */
 #define LOG_ID_DEVINIT_PHASE0B	0x083f	/* version, canary DMEM, 0xc00ee, branch, read-back, mult, pair */
+#define LOG_ID_DEVINIT_DQCAL3	0x0840	/* rank, d5, d0..d4 (packed), 0x01r0ad, 0x01r0af */
+#define LOG_ID_DEVINIT_END	0x0841	/* 0xc0086, 0x20060, 0x20011, 0x2000a, 0x20187 */
+#define LOG_ID_QB_DLL		0x0842	/* 0x20009, 0x20049, 0x200cf, 0x2004e+ps, 0x01r0ad/0af r0, 0x2000a, 0x20060 */
 
 void log_stream(uint8_t level, uint16_t id, const uint32_t *p, uint16_t len);
 void log_words(uint8_t level, uint16_t id, int n, ...);

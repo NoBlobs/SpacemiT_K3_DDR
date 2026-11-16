@@ -1,0 +1,19 @@
+289dc2b7bd25bf9d88ce9e7e263e95234868ca14
+ drivers/ddr/spacemit/k3/Kconfig                    |  71 ++++++++
+ drivers/ddr/spacemit/k3/Makefile                   |  19 ++
+ drivers/ddr/spacemit/k3/ddr_init.c                 |  97 ++++++++++
+ drivers/ddr/spacemit/k3/k3_ddr.h                   |  24 +++
+ drivers/ddr/spacemit/k3/lpddr5_init.c              |  36 +++-
+ .../ddr/spacemit/k3/lpddr5_pre_training_table.c    |   7 +-
+ drivers/ddr/spacemit/k3/lpddr_common.c             | 199 +++++++++++++--------
+ drivers/ddr/spacemit/k3/lpddr_training_result.c    | 159 ++++++++++++++++
+ 8 files changed, 531 insertions(+), 81 deletions(-)
+?? configs/k3_freefw.config
+?? configs/k3_freefw_csrdump.config
+?? configs/k3_freefw_csrscan.config
+?? configs/k3_freefw_devinit.config
+?? configs/k3_freefw_pllprobe.config
+?? configs/k3_freefw_probe.config
+?? configs/k3_freefw_refenv.config
+?? drivers/ddr/spacemit/k3/lpddr5_free_fw.S
+?? drivers/ddr/spacemit/k3/lpddr5_ref_env.S

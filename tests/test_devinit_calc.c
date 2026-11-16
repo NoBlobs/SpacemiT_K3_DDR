@@ -62,5 +62,26 @@ int main(void)
 	CHECK(acsm_mrw1(1, 17) == 0x48d8 && acsm_mrw2(1, 0xae) == 0x5748);
 	CHECK(acsm_mrw1(2, 17) == 0x88d8 && acsm_mrw2(2, 0xae) == 0x9748);
 
+	/* NOP pairs (docsClean 8aa6257) */
+	CHECK(acsm_nop_count(17, 8) == 2 && acsm_nop_hw3(2) == 0x2b00 && acsm_nop_hw7(2) == 0);
+	CHECK(acsm_nop_count(1, 1) == 0 && acsm_nop_hw3(0) == 0 && acsm_nop_hw7(0) == 0);
+	CHECK(acsm_nop_hw3(acsm_nop_count(4, 1)) == 0x3b00);
+	CHECK(acsm_nop_hw3(acsm_nop_count(5, 1)) == 0x4b00);
+	CHECK(acsm_nop_hw3(9) == 0x1b00 && acsm_nop_hw7(9) == 0x0400);
+	CHECK(acsm_nop_hw3(15) == 0x7b00 && acsm_nop_hw7(15) == 0x0400);
+	CHECK(acsm_nop_hw3(255) == 0x7b00 && acsm_nop_hw7(255) == 0x7c00);
+	/* ZQ MPC variant 1 */
+	CHECK(acsm_mpc25_hw0(0x0f, 0x86) == 0xf870 && acsm_cs_hw3(0x0f) == 0x0010);
+	CHECK(acsm_mpc26_hw0(0, 0x86) == 0x0306 && acsm_cs_hw3(0) == 0);
+	/* Step 3.6 selection */
+	{
+		static const uint16_t ref[5] = { 0, 0, 0x41, 0x85, 0xca };
+		static const uint16_t zero[5] = { 0 };
+
+		CHECK(dq_step_select(ref, 0x43) == 2);
+		CHECK(dq_step_select(ref, 0x41) == 2);
+		CHECK(dq_step_select(zero, 0x43) == 5);
+	}
+
 	CHECK_DONE("test_devinit_calc");
 }

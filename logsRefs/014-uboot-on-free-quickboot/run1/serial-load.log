@@ -1,0 +1,22 @@
+[ 451.295] fastboot 0
+dwc3-generic-peripheral dwc3@cad00000: this is a DesignWare USB3 DRD Core
+
+## host: fastboot stage <scratch>/bianbu/initrd.img-6.18.3-generic -> 0 Sending '<scratch>/bianbu/initrd.img-6.18.3-generic' (15506 KB) OKAY [  0.343s] | Finished. Total time: 0.343s
+[ 452.327] ................=> 
+=> cp.b 0x140000000 0x130000000 0xf24972
+=> crc32 0x130000000 0xf24972
+=> fastboot 0
+dwc3-generic-peripheral dwc3@cad00000: this is a DesignWare USB3 DRD Core
+
+## host: fastboot stage <scratch>/bianbu/k3-pico-itx.dtb -> 0 Sending '<scratch>/bianbu/k3-pico-itx.dtb' (142 KB) OKAY [  0.004s] | Finished. Total time: 0.004s
+[ 463.678] .=> 
+=> cp.b 0x140000000 0x138000000 0x23bda
+=> crc32 0x138000000 0x23bda
+=> fastboot 0
+dwc3-generic-peripheral dwc3@cad00000: this is a DesignWare USB3 DRD Core
+
+## host: fastboot stage <scratch>/bianbu/Image -> 0 Sending '<scratch>/bianbu/Image' (35350 KB) OKAY [  0.792s] | Finished. Total time: 0.793s
+[ 472.719] ...................................=> 
+=> crc32 0x140000000 0x2285a00
+=> setenv bootargs earlycon=sbi console=ttyS0,115200 loglevel=8 clk_ignore_unused
+=> 

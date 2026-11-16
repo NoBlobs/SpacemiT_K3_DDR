@@ -3,13 +3,14 @@
 DevInit (``SequenceCtrl[0]``)
 =============================
 
-Status: **implemented per docsClean/07 (19ab858); DevInit completes with
-status OK on both PHYs: PLL running, period ``0x84``–``0x86``, MRW burst
-executed by the ACSM** [:exp:`009`]. Open: the ZQ calibration ``MPC`` burst
-(J2) and step 3.6 lanes 1–8 (J3). The training firmware still ends with
-``0xff`` because the later stages are stubs.
+Status: **implemented per docsClean/07 (8aa6257); DevInit completes with
+status OK on both PHYs: PLL running, period ``0x84``–``0x86``, step 3.6
+``k = 2`` on all ranks, MRW and ZQ ``MPC`` bursts executed by the ACSM**
+[:exp:`010`]. Open: ``0xc0086`` reads ``1`` instead of ``3`` (L1). The
+training firmware still ends with ``0xff`` because the later stages are
+stubs.
 
-Sequence (docsClean 19ab858)
+Sequence (docsClean 8aa6257)
 ----------------------------
 
 =========  ==============================================================  =====================
@@ -24,10 +25,10 @@ Step       Content                                                         State
            ``0x20072/73``, ``0x20011``, ``0x01r0a3``
 3.4        DQ block reset on ``0x20303``–``0x20320``                       done
 3.5        DRAM reset / PLL sequencing, 400 µs lock wait                   done, PLL runs
-3.6        per-rank DQ calibration, result in ``0x01r0ad``                lanes 1–8 fall back (J3)
+3.6        per-rank DQ calibration, ``0x01r0ad``, ``0x01r0af``            done, ``k = 2``
 3.7        period latch, frequency buckets, ``0x01r0d9 = 0x9c``            done, ``0x84``–``0x86``
-6.1        ACSM dividers, one-shot NOP flush, block disable                done
-6.2        tINIT3, ``0x20060 = 3``, tINIT4/5, routing, MRW burst           done; ZQ ``MPC`` (J2) missing
+6.1        ACSM dividers, 4-unit NOP flush, block disable                  done
+6.2        tINIT3, ``0x20060 = 3``, tINIT4/5, routing, MRW + ZQ ``MPC``     done
 6.3        masks, ``0x20042``, ``0x20044``, channel commit,               done
            ``0x01r0a3`` restore, ``0x000a4 = 1``
 =========  ==============================================================  =====================
@@ -88,3 +89,27 @@ polls later.
 Oracle for the DRAM initialisation: MRR of MR5–MR8 per rank (Micron ID,
 density and width consistent with ``MT62F2G32D4DS``) and ``0xc0086 = 3``
 after DevInit (:dc:`14`).
+[:exp:`010`]: ACSM entries are 8-halfword pairs; NOP repeat count
+``r = ceil(cycles / div) − 1`` split across ``hw3[14:12]`` and ``hw7[14:10]``.
+The 48-halfword ZQ ``MPC`` burst (variant 1) reads done after 3 polls.
+
+Step 3.6
+--------
+
+One capture per rank at sub-block 0 (``0x01r0d0``–``0x01r0d5``); there is no
+lane loop. [:exp:`009`] looped over lanes 0–8: lanes 1–8 read zeros and
+overwrote ``0x01r0ad`` with the fallback ``5``. [:exp:`010`]: one capture per
+rank gives ``d = {0, 0, 0x41, 0x85, 0xca}``, ``d5 = 0x42``–``0x45`` and
+``k = 2`` on all eight ranks; ``0x01r0af`` (copied from ``0x01r0d6``) reads
+``0x3b``–``0x3f``.
+
+Quickboot path
+--------------
+
+With ``Quickboot != 0`` ``stage_devinit`` runs ``quickboot_run()`` instead of
+the DevInit dispatcher (docsClean/11, 066c550): phase 0, startup script,
+``0x2008b``/``0x20072/73`` without the ``0x01r0a3`` mask, DQ block reset,
+Step 3.5 DRAM reset / PLL, Step 6.1 flush, the MRW burst without ``tINIT``,
+and the step 6 DLL recalibration (log ``0x0842``). No period calibration and
+no Step 3.6. The saved ``phypara`` passes are applied by the host
+[:exp:`013`]. Not yet done: the extra MR6/MR7/MR40 writes (question S1).

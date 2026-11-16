@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 /* Copyright (C) 2026 Thalles Campagnani */
 /* Training stages not implemented yet. Each moves to its own file when done. */
+#include "train/eye.h"
 #include "train/train.h"
 
 #define STUB(name) \

@@ -1,0 +1,10 @@
+booti 0x140000000 0x130000000:0xf24972 0x138000000
+Moving Image from 0x140000000 to 0x102200000, end=104515000
+[ 546.665] ## Flattened Device Tree blob at 138000000
+[ 546.667]    Booting using the fdt blob at 0x138000000
+[ 546.872]    Loading Ramdisk to 3fae54000, end 3fbd78972 ... OK
+[ 546.877]    Loading Device Tree to 00000003fae2d000, end 00000003fae53bd9 ... OK
+
+Starting kernel ...
+
+[ 546.889] Removing MTD device #0 (nor0) with use count 1

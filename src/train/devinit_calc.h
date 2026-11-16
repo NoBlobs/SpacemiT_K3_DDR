@@ -106,4 +106,58 @@ static inline uint16_t acsm_mrw2(unsigned int cs, unsigned int op)
 	return (uint16_t)(((cs & 3u) << 14) | ((op & 0x7fu) << 7) | ((op & 0x80u) >> 1) | 0x0008u);
 }
 
+/* ACSM NOP pair (8 halfwords): repeat count r = ceil(cycles / div) - 1. */
+static inline unsigned int acsm_nop_count(unsigned int cycles, unsigned int div)
+{
+	return (cycles + div - 1u) / div - 1u;
+}
+
+static inline uint16_t acsm_nop_hw3(unsigned int r)
+{
+	return r ? (uint16_t)(((r & 7u) << 12) | 0x0b00u) : 0;
+}
+
+static inline uint16_t acsm_nop_hw7(unsigned int r)
+{
+	return (uint16_t)((r & 0xf8u) << 7);
+}
+
+/* ZQ MPC, variant 1: first half (cmd 0x25) and second half (cmd 0x26). */
+static inline uint16_t acsm_mpc25_hw0(unsigned int cs, unsigned int op)
+{
+	unsigned int f = ((op >> 1) & 0x40u) | 0x30u;
+
+	return (uint16_t)(((cs & 3u) << 14) | (f << 7) | f);
+}
+
+static inline uint16_t acsm_cs_hw3(unsigned int cs)
+{
+	return (cs & 2u) ? 0x0010u : 0;
+}
+
+static inline uint16_t acsm_mpc26_hw0(unsigned int cs, unsigned int op)
+{
+	return (uint16_t)(((cs & 3u) << 14) | ((op & 0x7fu) << 7) | (op & 0x7fu));
+}
+
+/*
+ * Step 3.6 step selection: first k in 0..4 with 2*d[k] >= d5 and
+ * |d[k+1] - d[k] - d5| <= d5*14/100, where d[5] = 0x3ff; else 5.
+ */
+static inline unsigned int dq_step_select(const uint16_t d[5], uint16_t d5)
+{
+	unsigned int k, tol = d5 * 14u / 100u;
+
+	for (k = 0; k < 5; k++) {
+		int next = k < 4 ? d[k + 1] : 0x3ff;
+		int diff = next - (int)d[k] - (int)d5;
+
+		if (diff < 0)
+			diff = -diff;
+		if (2u * d[k] >= d5 && (unsigned int)diff <= tol)
+			return k;
+	}
+	return 5;
+}
+
 #endif

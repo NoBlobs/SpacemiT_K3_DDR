@@ -81,7 +81,11 @@ DECODERS = {0x0800: ("BOOT", lambda w: f"id={w[0]:#x} ver={w[1]:#x}"),
             0x083e: ("DEVINIT_DQCAL", lambda w: "rank=%d d5=%#x k[l0..8]=%s fallbacks=%d 0x01r0ad=%d" % (
                 w[0], w[1], "".join(str((w[2] >> (3 * l)) & 7) for l in range(9)), w[3], w[4])),
             0x083f: ("DEVINIT_PHASE0", lambda w: ("ver=%d dmem424=%#06x dmem426=%#06x c00ee=%#x branch=%d | read-back lo=%#x hi=%#x "
-                                                  "| mult=%d pair=%#x" % (w[0], w[1], w[2], w[3], w[4], w[7], w[8], w[9], w[10])))}
+                                                  "| mult=%d pair=%#x" % (w[0], w[1], w[2], w[3], w[4], w[7], w[8], w[9], w[10]))),
+            0x0840: ("DEVINIT_DQCAL3", lambda w: "rank=%d d5=%#x d0..d4=%#x %#x %#x %#x %#x 0x01r0ad=%d 0x01r0af=%#x" % (
+                w[0], w[1], w[2] >> 16, w[2] & 0xffff, w[3] >> 16, w[3] & 0xffff, w[4], w[5], w[6])),
+            0x0841: ("DEVINIT_END", lambda w: "c0086=%#x 20060=%#x 20011=%#x 2000a=%#x 20187=%#x" % tuple(w[:5])),
+            0x0842: ("QB_DLL", lambda w: "20009=%#x 20049=%#x 200cf=%#x 2004e=%#x 0100ad=%#x 0100af=%#x 2000a=%#x 20060=%#x" % tuple(w[:8]))}
 
 
 def main(path):
