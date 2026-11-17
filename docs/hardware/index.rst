@@ -18,5 +18,9 @@ license of this part) with the results of our own experiments.
    message-block
    mailbox
    phy-csr-map
+   phy-clock-dll
+   acsm
+   dq-data-path
    results-persistence
+   quickboot-sequence
    board-access

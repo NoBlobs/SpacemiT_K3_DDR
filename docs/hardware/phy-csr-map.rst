@@ -13,12 +13,12 @@ Index decomposition [spec: :dc:`02`]:
 ================= ============== ======================================================
 Group             ARC base       Role [spec]
 ================= ============== ======================================================
-``0x01``          ``0x90020000`` per-rank / per-lane DQ timing, VREF, ODT, eye centres
+``0x01``          ``0x90020000`` per-dbyte / per-bit DQ timing, VREF, ODT, eye centres
 ``0x02``          ``0x90040000`` PHY engine control, DevInit clock period, MemReset
 ``0x03``          ``0x90060000`` CA training (LPCA), CA TX drive
 ``0x04``          ``0x90082000`` ACSM SRAM (``0x41000``)
 ``0x05``          ``0x900a0000`` IMEM/DMEM host windows
-``0x07``          ``0x900e0000`` max read latency
+``0x07``          ``0x900e0000`` PHY pattern generator (training), max read latency
 ``0x09``          ``0x90120000`` PHY / P-state configuration
 ``0x0a``          ``0x90140000`` P-state SRAM
 ``0x0c``/``0x0d`` ``0x90180000`` mailbox, clocks (``0xc0080``), mux (``0xd0000``), reset (``0xd0099``)
@@ -72,15 +72,68 @@ controllers (``0x00bd``/``0x00ff``) and looks like a live status.
 Individual registers
 --------------------
 
-======================= ======================= ======================================================================================
-Index                   Value at PMU start      Notes
-======================= ======================= ======================================================================================
-``0x20011``             ``0x006f`` (host table) calibration control; :dc:`07` says restore ``0x0041`` [:exp:`003`]
-``0x200e3``             ``0x0000``              read/write; period-measurement trigger per :dc:`07` [:exp:`003`]
-``0x300bf``             ``0x0000``              CA period counter; stays 0 after triggering [:exp:`003`]
-``0x100e0``             ``0x0000``              DQ period counter; stays 0 after triggering [:exp:`003`]
-``0x200c9``             ``0x0000`` (after run)  "PLL lock status" (:dc:`08`)
-``0xc0086``             ``0x0001`` (host table) sticky status; 3 after DevInit per :dc:`14`
-``0x20060``             ``0x0002`` (host table) changed by DevInit per :dc:`09`
-``0xc00f1``–``0xc00f7`` host table              seven values; candidate PHY PLL settings (matches the seven ``QBPll*`` outputs) [open]
-======================= ======================= ======================================================================================
+Detailed pages: :doc:`phy-clock-dll` (clock mode, DLL, strobes), :doc:`acsm`
+(sequencer), :doc:`dq-data-path` (group ``0x01``).
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 18 60
+
+   * - Index
+     - Value
+     - Notes
+   * - ``0x20011``
+     - ``0x006f`` (host table)
+     - saved and masked ``& 0xff9f`` in DevInit step 3.3, restored in step 6.3 [:exp:`010`]
+   * - ``0x200e3``
+     - ``0x0000``
+     - bit 10 falling edge latches the period counters [:exp:`007`]
+   * - ``0x300bf``, ``0x100e0``
+     - ``0x0240`` unlatched
+     - CA / DQ period counters; ``0x84``–``0x87`` with the PLL running [:exp:`008`]
+   * - ``0x200c9``
+     - ``0x0000``
+     - never polled by the PMU [spec]
+   * - ``0xc0086``
+     - ``0x0001`` (host table)
+     - host-side ECC control; the full-training PMU never touches it [spec, :exp:`010`]
+   * - ``0x20060``
+     - ``0x0002`` (host table)
+     - ``MemResetL``; ``3`` after DevInit with ``Misc = 0`` [:exp:`010`]
+   * - ``0x01<r>00f``
+     - ``0x1086`` (host table)
+     - ``0x1006`` after step 3.5, ``0x1004`` after step 3.6; the host writes ``0x1089`` after training [:exp:`010`]
+   * - ``0x01<r>0ad``
+     - ``2``
+     - step 3.6 selection on all dbytes [:exp:`010`]
+   * - ``0x01<r>0af``
+     - ``0x3a``–``0x3f``
+     - copy of ``0x01<r>0d6`` in step 3.6 [:exp:`010`]
+   * - ``0x200cf``
+     - ``0x001f`` idle
+     - DLL code, live only while ``0x2f0e0 = 1``: ``0x0c`` / ``0x0d`` [:exp:`016`]
+   * - ``0x2004e``
+     - ``0x0c`` / ``0x0d``
+     - stored DLL code (PHY0 / PHY1) [:exp:`019`]
+   * - ``0x20314``, ``0x20315``
+     - ``0x36``, ``0x7a``
+     - read-only calibration outputs, source of the ACSM dividers [:exp:`012`]
+   * - ``0x030084``, ``0x01000a``
+     - ``1`` (final state)
+     - ACSM routing; ``0`` while the PMU sends commands [:exp:`019`]
+   * - ``0x2007e``
+     - ``0x33`` (final state)
+     - ``(cs_b << 2) | cs_a`` per channel; ``0`` during RdDQS [spec]
+   * - ``0x000a4``
+     - ``0`` (final state)
+     - ``1`` written at the end of DevInit [:exp:`017`]
+   * - ``0xd00e7``
+     - ``0x0080`` before
+     - ``0x0600`` written by the host at the end of quickboot [:exp:`016`]
+   * - ``0xc00f1``–``0xc00f7``
+     - host table
+     - seven values; candidate PHY PLL settings (matches the seven ``QBPll*`` outputs) [open]
+
+PHY version: ``0xc00ee & 0xfff = 0x240`` decodes to version code 9; the
+signature ``0x6745`` / ``0x00f2`` is written to and read back from
+``0x9002e`` / ``0x9002f`` [:exp:`008`].

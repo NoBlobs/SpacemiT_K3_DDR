@@ -39,6 +39,12 @@ DDRC:
    :exp:`005` showed those registers do not exist on the K3; the probe is kept
    only as the record of that experiment.
 
+``train`` as an experiment vehicle
+   The training firmware itself carries the quickboot path and the RdDQS
+   probe; which one runs is chosen by the message block (``Quickboot``,
+   ``SequenceCtrl``, flag ``0xa5`` in byte 0) and by the SPL fragment
+   (:doc:`../uboot-spl/quickboot-host`). Experiments :exp:`011`–:exp:`019`.
+
 Rules for experiment firmwares
 ------------------------------
 

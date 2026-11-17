@@ -4,7 +4,8 @@ Training engine
 ===============
 
 Status: **engine implemented and unit-tested natively; not yet used by a
-stage** (no stage has a register-level specification yet, questions U1–U5).
+stage**: the RdDQS probe gets no PASS/FAIL information from the PHY yet
+(:doc:`stages`).
 
 ``src/train/eye.h`` is pure code on an explicit context (no MMIO, no global
 state), after the three-level model of :dc:`07`:
@@ -43,3 +44,12 @@ Real data
 taps (median about 100) with the trained value within a few taps of the
 centre. A host write to these CSRs takes effect immediately. These
 windows are the level 2 input a RdDQS stage has to reproduce.
+
+Differences from the reference to resolve when a stage uses it [spec:
+:dc:`07`]: the reference 2D centre is a weighted centroid over the passing
+rows (``X_c``, ``Y_c``; weight ``n``, ``n²`` or a tier by
+``Train2DMisc[12:11]``), not the best-score point of ``eye_pick_2d()``; its
+1D selection keeps the longest PASS island, as ``eye_longest_run()`` does; its
+margins are ``min`` over lanes accumulated per rank into the message block
+(``0x037``–``0x03e``, ``0x052``–``0x059``: ``+0`` vertical, ``+1``
+horizontal).

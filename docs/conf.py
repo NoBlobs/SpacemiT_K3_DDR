@@ -29,6 +29,12 @@ html_theme_options = {
 }
 pygments_style = "sphinx"
 
+# _static/tables.css: let table cells wrap (the theme keeps them on one line).
+# _static/theme_persist.js: keep the light/dark choice across local files.
+html_static_path = ["_static"]
+html_css_files = ["tables.css"]
+html_js_files = ["theme_persist.js"]
+
 # ---------------------------------------------------------------------------
 # Links to the repository and to the docsClean submodule on GitHub.
 #

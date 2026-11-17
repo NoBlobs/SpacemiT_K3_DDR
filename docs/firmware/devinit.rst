@@ -4,34 +4,57 @@ DevInit (``SequenceCtrl[0]``)
 =============================
 
 Status: **implemented per docsClean/07 (8aa6257); DevInit completes with
-status OK on both PHYs: PLL running, period ``0x84``–``0x86``, step 3.6
-``k = 2`` on all ranks, MRW and ZQ ``MPC`` bursts executed by the ACSM**
-[:exp:`010`]. Open: ``0xc0086`` reads ``1`` instead of ``3`` (L1). The
-training firmware still ends with ``0xff`` because the later stages are
-stubs.
+status OK on both PHYs: PLL running, period ``0x84``–``0x87``, step 3.6
+``k = 2`` on all dbytes, MRW and ZQ ``MPC`` bursts executed by the ACSM, final
+``0x20011 = 0x006f``, ``0x20060 = 3``, ``0xc0086 = 1``** [:exp:`010`]. These
+match every USB/FDL reference result of the board [:exp:`012`]. A full
+training run still ends with ``0xff`` because the later stages are not
+implemented; with ``Quickboot != 0`` the stage runs the quickboot path
+instead (:doc:`quickboot`).
 
 Sequence (docsClean 8aa6257)
 ----------------------------
 
-=========  ==============================================================  =====================
-Step       Content                                                         State
-=========  ==============================================================  =====================
-0          ``0x20090 = 1``, ``byte[1] & 1`` branch, version decode        done
-           (``0xc00ee``), canary ``0x9002e/f``, delay multiplier
-1          ``0x200a2[1:0] = 1`` (reference clock), ``0x200f8``,            done
-           ``0x20060 = 2``
-2          delay shift from ``0xc0080``; commit strobe triad               done
-3.1–3.3    ``QBPll*``, ``0x800004cc`` descriptors, ``0x2008b``,            done
-           ``0x20072/73``, ``0x20011``, ``0x01r0a3``
-3.4        DQ block reset on ``0x20303``–``0x20320``                       done
-3.5        DRAM reset / PLL sequencing, 400 µs lock wait                   done, PLL runs
-3.6        per-rank DQ calibration, ``0x01r0ad``, ``0x01r0af``            done, ``k = 2``
-3.7        period latch, frequency buckets, ``0x01r0d9 = 0x9c``            done, ``0x84``–``0x86``
-6.1        ACSM dividers, 4-unit NOP flush, block disable                  done
-6.2        tINIT3, ``0x20060 = 3``, tINIT4/5, routing, MRW + ZQ ``MPC``     done
-6.3        masks, ``0x20042``, ``0x20044``, channel commit,               done
-           ``0x01r0a3`` restore, ``0x000a4 = 1``
-=========  ==============================================================  =====================
+.. list-table::
+   :header-rows: 1
+   :widths: 10 70 20
+
+   * - Step
+     - Content
+     - State
+   * - 0
+     - ``0x20090 = 1``, ``byte[1] & 1`` branch, version decode (``0xc00ee``), canary ``0x9002e/f``, delay multiplier
+     - done
+   * - 1
+     - ``0x200a2[1:0] = 1`` (reference clock), ``0x200f8``, ``0x20060 = 2``
+     - done
+   * - 2
+     - delay shift from ``0xc0080``; commit strobe triad
+     - done
+   * - 3.1–3.3
+     - ``QBPll*``, ``0x800004cc`` descriptors, ``0x2008b``, ``0x20072/73``, ``0x20011``, ``0x01r0a3``
+     - done
+   * - 3.4
+     - DQ block reset on ``0x20303``–``0x20320``
+     - done
+   * - 3.5
+     - DRAM reset / PLL sequencing, 400 µs lock wait
+     - done, PLL runs
+   * - 3.6
+     - per-dbyte DQ calibration, ``0x01r0ad``, ``0x01r0af``
+     - done, ``k = 2``
+   * - 3.7
+     - period latch, frequency buckets, ``0x01r0d9 = 0x9c``
+     - done, ``0x84``–``0x87``
+   * - 6.1
+     - ACSM dividers, 4-unit NOP flush, block disable
+     - done
+   * - 6.2
+     - tINIT3, ``0x20060 = 3``, tINIT4/5, routing, MRW + ZQ ``MPC``
+     - done
+   * - 6.3
+     - masks, ``0x20042``, ``0x20044``, channel commit, ``0x2006e = 0``, restore of ``0x20011``, ``0x01r0a3``, ``0x20072/73``, ``0x90808/13``, ``0x000a4 = 1``
+     - done
 
 The pure computations (frequency buckets, two-tier delays, ACSM MRW
 encoding) are in ``src/train/devinit_calc.h`` with unit tests
@@ -107,14 +130,4 @@ Quickboot path
 --------------
 
 With ``Quickboot != 0`` ``stage_devinit`` runs ``quickboot_run()`` instead of
-the DevInit dispatcher (docsClean/11, 066c550): phase 0, startup script,
-``0x2008b``/``0x20072/73`` without the ``0x01r0a3`` mask, DQ block reset,
-Step 3.5 DRAM reset / PLL, Step 6.1 flush, the MRW burst without ``tINIT``,
-and the step 6 DLL recalibration (log ``0x0842``). No period calibration and
-no Step 3.6. The saved ``phypara`` passes are applied by the host
-[:exp:`013`]. Step 6 samples ``0x200cf`` while ``0x2f0e0 = 1`` and returns the reference
-code [:exp:`016`]. The MR writes follow the two-pass sequence with the FSP switch and the
-``cmd 0x28`` entry [:exp:`018`]. Between the MR tail and step 6 the path switches back to the direct
-clock, clears ``0x2006e``, runs the per-rank step and clears
-``0x01f0b3/b4``; with this order the memory test is clean in 10 of 10 boots
-[:exp:`019`].
+the DevInit dispatcher; see :doc:`quickboot`.

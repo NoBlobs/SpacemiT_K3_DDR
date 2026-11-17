@@ -53,3 +53,29 @@ every DMEM range is checked by experiment [open].
    Never access DPHY/PMU MMIO from Linux (``/dev/mem``): reported to stall the
    SoC until a power cycle [spec: :dc:`14`]. Re-verification is scheduled
    for the later validation phase.
+
+Host access after a PMU run
+---------------------------
+
+What the SPL can reach once the PMU has run and been stalled
+(``0xd0099 = 1``, ``0xd0000 = 0``) [:exp:`016`, :exp:`019`]:
+
+================== =====================================================
+Target             Behaviour
+================== =====================================================
+PHY CSRs           read and write work with ``0xc0080 = 3``
+ACSM SRAM          read and write work with ``0xc0080 = 3`` (4096 of
+                   4096 halfwords read back)
+DMEM (message      **reads work, writes are dropped** with ``0xc0080 = 3``
+block)             (a ``SequenceCtrl`` write reads back the old value);
+                   with ``0xd0099 = 9`` DMEM reads ``0``
+================== =====================================================
+
+:dc:`12` gives the sequence for a DMEM write between two runs: ``0xd0099 =
+1``, ``0xd0000 = 0``, **``0xc0080 = 7``**, write, ``0xd0000 = 1``, then
+``0xd0099 = 9, 1, 0`` [spec, not yet tried]. The initial load, before the
+first start, works with the vendor flow as is.
+
+A second start of the loaded firmware (``0xd0000 = 1``, ``0xd0099 = 9, 1,
+0``) works without reloading IMEM or DMEM: the firmware runs again from its
+entry and the message block keeps what the first run left [:exp:`016`].

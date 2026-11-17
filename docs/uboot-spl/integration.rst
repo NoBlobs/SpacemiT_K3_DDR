@@ -24,6 +24,20 @@ Kconfig (``drivers/ddr/spacemit/k3/Kconfig``)
    ``0x5c000`` and print every host value (``PMU<n> P``/``A`` lines, extracted by
    ``tools/dump_extract.py``).
 
+``K3_DDR_REF_ENVELOPE``, ``K3_DDR_REF_ENVELOPE_PATH``
+   embed a reference ``DDRT`` envelope (``0x9800`` bytes) as a development
+   fixture and restore it after the PMU run; adds the sampled memory test and
+   halts. See :doc:`quickboot-host`.
+``K3_DDR_REF_QUICKBOOT``
+   host-assisted quickboot: saved ``phypara`` written before the PMU starts,
+   firmware run with ``Quickboot = 1``, Pass 3 and the ACSM image after it.
+``K3_DDR_REF_BOOT``
+   continue the boot when the memory test is clean.
+``K3_DDR_REF_EYESCAN``
+   read-eye scan of the per-bit read delays from the host.
+``K3_DDR_REF_PROBE``
+   second PMU run with the RdDQS probe.
+
 Fragments: ``configs/k3_freefw.config`` (training),
 ``configs/k3_freefw_probe.config`` (probe experiments) and
 ``configs/k3_freefw_csrdump.config`` (CSR read-out comparison).
@@ -42,10 +56,18 @@ Code changes
    after the DMEM clear, loads ``k3_free_fw_dmem_table``; a non-``0x07`` mailbox
    result aborts the controller and sets ``k3_pmu_failed``.
 ``ddr_init.c``
-   forces full training (no free quickboot firmware yet); halts with a message
-   if any PMU run failed, so DDRC ports are never enabled on an untrained PHY.
+   forces the training path (the vendor quickboot image is never run); halts
+   with a message if any PMU run failed, so DDRC ports are never enabled on an
+   untrained PHY. With ``K3_DDR_REF_QUICKBOOT`` the free firmware runs its own
+   quickboot path instead (:doc:`quickboot-host`).
 ``lpddr_common.c``
    new mailbox receiver, see :doc:`mailbox-host`.
+``lpddr5_ref_env.S``, ``lpddr_training_result.c``
+   the embedded fixture and the restore code (``k3_ref_*``, ``k3_qb_*``), see
+   :doc:`quickboot-host`.
+``ddr_init.c`` (with ``K3_DDR_REF_ENVELOPE``)
+   fixture copy, sampled memory test, read-eye scan, header clearing, halt or
+   continue.
 
 The SPL still writes the vendor DMEM table at ``0x58000``–``0x584d1``; the free
 firmware reads only the documented message block there.

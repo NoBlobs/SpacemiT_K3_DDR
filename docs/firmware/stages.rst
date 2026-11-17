@@ -10,42 +10,73 @@ bits clear, rate 4800/6400, ``CsPresent`` and ``X8Mode`` legal), writes
 WrLvl (1) → RxEn (2) → RdDQS (3) → WrDq (4) → MxRdLat (9) → DRAM DCA (6) →
 PHY RD DCA (7) → PHY WR DCA (8) → DRAM DFE (10) → LPCA (12).
 
-Each stage gets major ``0x40 + bit`` and a ``LOG_ID_STAGE`` frame. All stages are
-stubs today (``src/train/stages.c``). The sweep and eye-selection code they
-will share is ready (:doc:`training-engine`).
+Each stage gets major ``0x40 + bit`` and a ``LOG_ID_STAGE`` frame. DevInit is
+implemented (:doc:`devinit`); RdDQS holds the transfer-and-compare probe
+below; the other stages are stubs that report "not implemented"
+(``src/train/stages.c``), so a full training run ends with ``0xff``. The
+sweep and eye-selection code they will share is ready
+(:doc:`training-engine`).
+
+Execution order in the reference [spec: :dc:`07`, e00a07a]: bit-aligned passes
+with retraining loops (``DisableTrainingLoop`` suppresses them), the 2D
+refinements of WrDq and RdDQS after the 1D stages, MxRdLat last; LPCA runs
+inside the DevInit tail. Our dispatcher runs each enabled stage once, in the
+order above [design].
 
 :dc:`07` reports that ``SequenceCtrl = 0x0009`` (DevInit + RdDQS) alone gives
 read delays within 1–2 taps of a full run, so RdDQS is the first stage to
-implement once its register sequence is specified (questions U1–U5).
+implement. Its register sequence is now specified by :dc:`07`; see below
+for what the board does with it.
 
-RdDQS probe
------------
+RdDQS (``SequenceCtrl[3]``): transfer-and-compare probe
+--------------------------------------------------------
 
-``src/train/rddqs.c`` holds the first code for ``SequenceCtrl[3]``: the
-hardware transfer-and-compare primitive of :dc:`07` (burst configuration,
-one-shot run of the burst at ACSM entry 200, per-lane result
-``0x01<d><l>b7``, sticky clear through ``0x01f0bb``), used as a probe that
-streams raw results (log ``0x0844``) and restores what it changed. It does
-not build the burst or program the pattern generator yet. [:exp:`016`]: the
-burst runs to done, the result register reads ``0`` at every delay, and no
-register in ``0xb0``–``0xbf`` reacts; the compare is not armed (questions
-W1–W4).
+Status: **the stage runs the hardware transfer-and-compare primitive of**
+:dc:`07` **as a probe; the PHY never reports an error, so nothing is trained
+yet** [:exp:`016`, :exp:`017`, :exp:`019`].
 
-A stage may run without DevInit when ``Quickboot != 0``. With the private
-flag ``0xa5`` in message byte 0 the quickboot path ends by writing
-``SequenceCtrl = 0x0008``, so that a second start of the firmware runs RdDQS
-alone (the host cannot rewrite the message block after a PMU run).
+``src/train/rddqs.c`` implements, for ``Pattern = 0`` (2D pass 1):
 
-[:exp:`017`]: with the arming of docsClean eae6813 (pattern generator group
-``0x07``, pattern mode registers MR31–MR34, ``0x01f001 = 1``, ``MR46 = 4``,
-``0x200c0/c1 = 8``, ``0x01f056 = 1``) the result still reads ``0`` at every
-read delay and every write delay (``0x10``–``0x13`` over 0..504). The stage
-code keeps this arming and its exit sequence; something that training sets
-before RdDQS is still missing (questions X1–X3).
+1. save every register it changes;
+2. PLL clock mode (``0x200f8 = 0``, ``0x200a2[1:0] = 2``);
+3. ``0x20072/73 = CsPresent``, ``0x2007a = 0x2007e = 0``, ``0x2f0a0`` pulse;
+4. burst generator: ``0x2006e = 0``, ``0x01f056 = 1``, ``0x01f0a7 = 0``,
+   ``0x200c0 = 0x200c1 = 0``, ``0x20079 = 0x40``, ``0x01f0b3 = 0x01f0b4 =
+   0x01f0b1 = 1``, ``0x01f0b0 = 0x34`` (``0x30`` at ratio 2);
+5. pattern generator: ``0x7f061..64 = 0xffff``, ``0x7f065 = 0``,
+   ``0x7f011 = 0x16``, ``0x7f060 = 0x88``, ``0x7f0d6 = 0x7f0d7 = 0x100``;
+6. ACSM routing ``0x3f084 = 0``, ``0x01f00a = 0``, ``0x2002a = 1``,
+   ``0x20041 = 1``;
+7. MRW one-shots from entry 0: ``MR33 = 0x3c``, ``MR34 = 0x5a``,
+   ``MR31 = MR32 = 0``; ``0x01f001 = 1``; ``MR46 = 4``; ``0x2f0a0`` pulse;
+8. the 20-entry write-then-read burst written at ACSM entry 200 for one
+   rank (``burst_build()``, :doc:`../hardware/acsm`);
+9. per point (``sweep()``): the candidate value in lane-broadcast form
+   (``0x01<d>f<reg>``), one-shot of entries 200..219, read ``0x01<d><l>b7``
+   for the nine lanes, ``0x01f0bb = 0x3ff``, then ``0``; the lanes are
+   restored after each sweep;
+10. exit: ``0x01f0b0 = 0x01f0b1 = 0``, ``0x01f056 = 0``, ``0x200c0/c1 = 0``,
+    ``0x20079 = 0``, ``0x7f011 &= ~0x10``, ``0x200a3 = 1``, ``0``, ``MR46 = 0``,
+    ``0x01f001 = 0``, then every saved value written back and the clock mode
+    as found.
 
-[:exp:`019`]: with the preconditions of docsClean e00a07a (PLL clock mode,
-``0x200c0/c1 = 0``, ``0x2007a/7e = 0``, pass 1 pair ``0x7f011 = 0x16`` /
-``0x7f060 = 0x88``), the burst written by the firmware itself at ACSM entry
-200 and the ACSM routing ``0x3f084 = 0`` / ``0x01f00a = 0``, the result is
-still ``0`` everywhere, and the memory test fails after the probe. The probe
-is not safe to run before DDRC activation yet (questions Z1–Z3).
+It streams raw frames (``RDDQS_PROBE``, ``0x0844``): the state found, each
+MRW run, and for every point the nine ``b7`` words. The sweeps are ``0x4e``
+and ``0x4f`` 0..124 (all dbytes on rank 1, dbyte 0 on rank 0) and the write
+delays ``0x11``/``0x13`` and ``0x10``/``0x12`` 0..504 on dbyte 0.
+
+Results so far:
+
+* every ACSM one-shot reaches done (MRW 1 poll, burst 4 polls);
+* ``b7`` is ``0`` at every point, including write delays far from the trained
+  ``0x13b``–``0x14d``, with and without ``0x000a4 = 1``, ``0x01f<l>be =
+  0x41``, ``0x200c0/c1 = 8``, ``0x20042/44`` set, or the direct clock;
+* the memory test fails after a probe run that switches the clock mode,
+  while the same quickboot without the probe is clean [:exp:`019`]. The
+  probe must not run before DDRC activation in a boot that is meant to work.
+
+What is missing is not known (questions Z1–Z3 in ``questions.md``). The
+selection code the stage will use is ready (:doc:`training-engine`).
+
+A stage may run without DevInit when ``Quickboot != 0`` (:doc:`quickboot`,
+"Second start").

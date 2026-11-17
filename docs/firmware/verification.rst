@@ -9,11 +9,51 @@ Automatic checks
 ``make check``
    ELF audit (``tools/audit.sh``).
 ``make test``
-   native tests: message block layout vs. docsClean, ``phypara`` order
-   (69 segments, 5170 unique indices).
+   native tests (``tests/``, host compiler):
+
+   * ``test_msgblk`` — message block layout against docsClean;
+   * ``test_phypara``, ``test_phypara_fw`` — ``phypara`` order (69 segments,
+     5170 unique indices) and the compact firmware table;
+   * ``test_devinit_calc`` — frequency buckets, two-tier delays, ACSM
+     encoders (MRW, NOP pairs, MPC), step 3.6 selection;
+   * ``test_eye`` — the training engine on synthetic eyes.
+
+Tools
+-----
+
+.. list-table::
+   :header-rows: 1
+   :widths: 35 65
+
+   * - Tool
+     - Purpose
+   * - ``tools/bench.sh``
+     - stage an FSBL through FDL, capture the serial console with timestamps, decode the mailbox stream
+   * - ``tools/serial_log.py``
+     - the serial capture (stops at a regular expression)
+   * - ``tools/mbox_decode.py``
+     - decode ``PMU<n> M`` / ``S`` lines into named frames
+   * - ``tools/gen_ref_envelope.py``
+     - build a ``DDRT`` fixture from a docsClean appendix and check its CRC
+   * - ``tools/eyescan_stats.py``
+     - summarise the host read-eye scan of a serial log
+   * - ``tools/gen_phypara.py``
+     - ``phypara`` order tables from the docsClean appendix
+   * - ``tools/gen_msgblk.py``
+     - message block field offsets (``msgblk_fields.h``)
+   * - ``tools/dump_extract.py``, ``dump_diff.py``, ``scan_extract.py``
+     - CSV files from the ``csrdump`` / ``csrscan`` experiments
+   * - ``tools/build_fsbl.sh``
+     - in-tree U-Boot build with a config fragment
+   * - ``tools/audit.sh``
+     - ELF audit
 
 Hardware checks
 ---------------
+
+The SPL-side checks used with a restored result (sampled 16 GiB memory test,
+read-eye scan) are described in :doc:`../uboot-spl/quickboot-host`.
+
 
 Every hardware run is staged through FDL and logged; runs with relevant
 findings become ``logsRefs/NNN-<name>/`` records (see :lr:`README.md`).

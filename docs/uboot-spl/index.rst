@@ -17,4 +17,5 @@ Tree: ``/home/thalles/0-git/NoBlobs/u-boot_SpacemiT_K3``, branch
    role
    integration
    mailbox-host
+   quickboot-host
    build-and-stage
