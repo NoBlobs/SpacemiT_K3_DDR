@@ -44,6 +44,8 @@
 #define LOG_ID_DEVINIT_DQCAL3	0x0840	/* rank, d5, d0..d4 (packed), 0x01r0ad, 0x01r0af */
 #define LOG_ID_DEVINIT_END	0x0841	/* 0xc0086, 0x20060, 0x20011, 0x2000a, 0x20187 */
 #define LOG_ID_QB_DLL		0x0842	/* 0x20009, 0x20049, 0x200cf, 0x2004e+ps, 0x01r0ad/0af r0, 0x2000a, 0x20060 */
+#define LOG_ID_QB_DLLPROBE	0x0843	/* tag, time us, 0x200cf, 0x2004e+ps, 0x20049, 0x200c3 */
+#define LOG_ID_RDDQS_PROBE	0x0844	/* tag, x, polls, 9 lane results of 0x01<d><l>b7 (packed) */
 
 void log_stream(uint8_t level, uint16_t id, const uint32_t *p, uint16_t len);
 void log_words(uint8_t level, uint16_t id, int n, ...);

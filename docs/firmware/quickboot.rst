@@ -36,3 +36,20 @@ Development only, with docsClean reference envelopes as fixtures
   relocates and runs (``DRAM: 16 GiB``) and 52 MB loaded over fastboot read
   back with matching CRCs. The fixture header is cleared so it is never
   saved to flash. Linux was not started: the USB/FDL chain has no OpenSBI.
+* [:exp:`015`]: the same path fails on whole byte lanes in 2 of 3 further
+  boots (5 clean of 7 overall). A host scan of ``0x01<r><l>4e/4f`` in the
+  clean boot gives per-bit read windows about 100 taps wide with the
+  trained value near the centre (margin 24 taps or more), so the failures
+  are not marginal read delays. ``0x200cf`` reads ``0x1f`` at every point of
+  the quickboot path: the DLL recalibration probably has no effect yet.
+* [:exp:`016`]: with the order of docsClean 8110257 (sample ``0x200cf`` while
+  ``0x2f0e0 = 1``) the DLL recalibration returns the reference code
+  (``0x0c``/``0x0d``). The ``0x2f052`` pulses, ZQCAL and the MR40/MR37/MR28
+  writes are added. Whole-byte-lane failures still occur.
+* [:exp:`018`]: the two-pass MR sequence with the FSP switch (``MR16 | 0x41``,
+  ``| 0x45``, ``& 0xbc``) and the ``cmd 0x28`` entry are implemented; 2 of 3
+  boots clean, so the per-boot failures are not caused by the MR sequence.
+* [:exp:`019`]: with the switch back to the direct clock after the MR tail
+  and before the DLL recalibration (docsClean e00a07a), the per-rank step and
+  ``0x01f0b3/b4 = 0``, the 16 GiB memory test is clean in **10 of 10** boots.
+  This closes the per-boot failures of experiments 013–018.

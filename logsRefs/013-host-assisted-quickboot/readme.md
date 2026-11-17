@@ -86,3 +86,7 @@ training, and the test halts after the memory test.
 Open: the extra MR6/MR7/MR40 writes are not issued, and `0x200cf` reads
 `0x1f` after step 6 (questions S1, S2); neither prevents a clean test.
 docsClean/11 needs `0x01r00d` in Pass 1 (question T1).
+
+Later boots of the same path (experiments 014 and 015) bring the count to
+5 clean boots of 7: two boots failed on whole byte lanes with identical
+firmware and logged values. The path is not reliable yet.

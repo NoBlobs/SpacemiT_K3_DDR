@@ -34,3 +34,12 @@ just outside the scan, so a margin is never larger than what was observed
 ``tests/test_eye.c`` checks it on synthetic elliptical eyes: centre and
 margins, isolated PASS islands, an intermittently failing point, hardware
 abort, an eye cut by the scan edge, coarse steps, and the weighted 2D pick.
+
+Real data
+---------
+
+[:exp:`015`]: a host scan of the per-bit read delays ``0x01<r><l>4e/4f``
+(``r`` = data byte, ``l`` = bit) on working DRAM gives windows of 82–122
+taps (median about 100) with the trained value within a few taps of the
+centre. A host write to these CSRs takes effect immediately. These
+windows are the level 2 input a RdDQS stage has to reproduce.

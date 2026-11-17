@@ -53,7 +53,8 @@ static int validate(struct train_ctx *c)
 	c->freq = freq;
 	c->pstate = MB_GET(Pstate);
 
-	if (!(c->seq & SEQ_DEVINIT) || (c->seq & SEQ_RESERVED))
+	/* a quickboot-state run (Quickboot != 0) may enable stages without DevInit */
+	if ((!(c->seq & SEQ_DEVINIT) && !MB_GET(Quickboot)) || (c->seq & SEQ_RESERVED))
 		return 1;
 	if (freq != 4800 && freq != 6400)
 		return 2;

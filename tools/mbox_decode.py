@@ -33,6 +33,40 @@ def dmem(w):
     return " ".join(f"{x >> 16:03x}:{x & 0xffff:04x}" for x in w)
 
 
+def RDDQS_PROBE(w):
+    if w[0] == 0x7f:
+        return "end: %d bursts not done" % w[1]
+    if w[0] == 0x20:
+        v = []
+        for x in w[2:10]:
+            v += [x >> 16, x & 0xffff]
+        return "dump variant=%d delay#%d lane=%d%s b0..bf=%s" % (
+            (w[1] >> 16) & 0xff, (w[1] >> 8) & 0xff, w[1] & 0xff, " NOT-DONE" if w[1] >> 31 else "",
+            " ".join("%04x" % x for x in v))
+    if w[0] == 0x07:
+        return "acsm as found: e200 hw0/hw3=%08x e204=%08x e205 hw0/hw1=%08x e206=%08x e213=%08x e216 hw0/hw3=%08x" % tuple(w[1:7])
+    if w[0] == 0x06:
+        return "step %d: value=%d polls=%d" % (w[1], w[2], w[3])
+    if w[0] == 0x05:
+        return "saved: %#x %#x %#x %#x %#x" % tuple(w[1:6])
+    if w[0] == 0x04:
+        return "pattern: 70061..64=%04x %04x %04x %04x be l0,l1,l2,l8=%04x %04x %04x %04x 7f011=%#x 7f060=%#x 700d6/7=%08x" % (
+            w[1] >> 16, w[1] & 0xffff, w[2] >> 16, w[2] & 0xffff, w[3] >> 16, w[3] & 0xffff,
+            w[4] >> 16, w[4] & 0xffff, w[5], w[6], w[7])
+    if w[0] == 0x01:
+        return ("setup: 20079=%#x 20022=%#x 20023=%#x 2002a=%#x 20041=%#x b0=%#x b1=%#x b3=%#x b4=%#x b5=%#x bb=%#x"
+                % (w[1], w[2] >> 16, w[2] & 0xffff, w[3] >> 16, w[3] & 0xffff, w[4] >> 16, w[4] & 0xffff,
+                   w[5] >> 16, w[5] & 0xffff, w[6], w[7]))
+    r = [w[3] >> 16, w[3] & 0xffff, w[4] >> 16, w[4] & 0xffff, w[5] >> 16, w[5] & 0xffff,
+         w[6] >> 16, w[6] & 0xffff, w[7] & 0xffff]
+    return "tag=%#04x x=%#08x polls=%d%s b7=%s" % (
+        w[0], w[1], w[2] & 0x7fffffff, " NOT-DONE" if w[2] >> 31 else "", " ".join("%04x" % v for v in r))
+
+
+def QB_DLLPROBE(w):
+    return "tag=%#04x t=%dus 200cf=%#x 2004e=%#x 20049=%#x 200c3=%#x" % tuple(w[:6])
+
+
 PLL_REGS = [0x200c3, 0x200c5, 0x200c6, 0x200c7, 0x200c9, 0x200ca, 0x200cc,
             0x200cd, 0x200cf, 0x300bf, 0x100e0, 0x20047, 0x200e3, 0x20011]
 
@@ -54,8 +88,11 @@ DECODERS = {0x0800: ("BOOT", lambda w: f"id={w[0]:#x} ver={w[1]:#x}"),
             0x0820: ("CSRDUMP", lambda w: "phypara n=%d nz=%d crc=%#x acsm n=%d nz=%d crc=%#x ticks=%d/%d" % tuple(w[:8])),
             0x0821: ("CSRSCAN", lambda w: "0x%05x+%d: " % (w[0], w[1]) + " ".join(
                 "%04x" % ((w[2 + k // 2] >> (16 * (k & 1))) & 0xffff) for k in range(w[1]))),
-            0x0822: ("PLLPROBE", lambda w: "tag=%#04x t=%dus " % (w[0], w[1]) + " ".join(
+            # experiment 015 run 3 sent the 6-word QB_DLLPROBE payload under this ID
+            0x0822: ("PLLPROBE", lambda w: QB_DLLPROBE(w) if len(w) == 6 else "tag=%#04x t=%dus " % (w[0], w[1]) + " ".join(
                 "%05x=%04x" % (r, (w[2 + k // 2] >> (16 * (k & 1))) & 0xffff) for k, r in enumerate(PLL_REGS))),
+            0x0843: ("QB_DLLPROBE", lambda w: QB_DLLPROBE(w)),
+            0x0844: ("RDDQS_PROBE", lambda w: RDDQS_PROBE(w)),
             0x0830: ("DEVINIT_CAL", lambda w: ("e3=%#x e5=%#x tca=%#x(%d) tdq=%#x(%d) 2*tca=%d n=%d freqval=%d n=%d 0x100d5=%#x ratio=%d"
                                                % (w[0], w[1], w[2], w[2], w[3], w[3], w[4], w[5], w[6], w[7], w[8], w[9]))),
             0x0831: ("DEVINIT_STATE", lambda w: "phase=%d 0xc0086=%#x 0x20011=%#x 0x2000a=%#x 0x20017=%#x 0x20012=%#x 0x20186=%#x 0x20187=%#x" % tuple(w[:8])),

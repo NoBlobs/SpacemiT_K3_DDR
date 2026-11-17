@@ -689,25 +689,26 @@ static void devinit_phase6_3(struct devinit *d)
  * allows) and re-applies Pass 3 and 0x90808/13 after the PMU halts. No period
  * calibration, no step 3.6, no 0x01<r>0a3 mask, no tINIT wait.
  */
-static int qb_mrw(struct devinit *d)
+/* The 18-entry MR table of the message block, MR16 first and with value mr16. */
+static int qb_table_burst(struct devinit *d, unsigned int mr16, uint32_t tag)
 {
 	static const uint8_t order[] = { 19, 18, 1, 2, 3, 10, 11, 17, 12, 14, 15, 16,
 					 20, 22, 24, 37, 40, 41 };
 	uint16_t cur;
 	unsigned int i, r;
-	int rc;
 
-	csr_wr(0x3f084, 0);
-	csr_wr(BCAST_CSR(0x00a), 0);
-	csr_wr(0x2002a, 1);
-	csr_wr(CSR_ACSM_BURST + d->ps, 1);
 	acsm_reset_ptr(d, &cur);
 	acsm_nop(&cur, 0);
+	acsm_mrw(&cur, 3, 16, mr16);
 	for (i = 0; i < sizeof(order); i++) {
 		unsigned int ma = order[i];
 		uint32_t off = mr_offset(ma);
 		int per_rank = ma == 17 || ma == 12 || ma == 14 || ma == 15 || ma == 24;
 
+		if (ma == 16) {
+			acsm_mrw(&cur, 3, ma, mr16);
+			continue;
+		}
 		if (!per_rank) {
 			acsm_mrw(&cur, 3, ma, mb_rd8(off));
 			continue;
@@ -716,11 +717,95 @@ static int qb_mrw(struct devinit *d)
 			if (d->c->cs_a & (1u << r))
 				acsm_mrw(&cur, 1u << r, ma, mb_rd8(off + r));
 	}
-	rc = acsm_oneshot(d, cur, 0x72);
+	return acsm_oneshot(d, cur, tag);
+}
+
+static int qb_mrw(struct devinit *d)
+{
+	unsigned int mr16 = mb_rd8(MB_MR16_A0);
+	uint16_t cur;
+	unsigned int r;
+	int rc;
+
+	csr_wr(0x3f084, 0);
+	csr_wr(BCAST_CSR(0x00a), 0);
+	csr_wr(0x2002a, 1);
+	csr_wr(CSR_ACSM_BURST + d->ps, 1);
+
+	/*
+	 * Two passes with a frequency-set-point switch (docsClean eae6813):
+	 * pass 0 with MR16 | 0x41 (FSP-WR = 1, VRCG) writes the set that is
+	 * not operating, MR16 | 0x45 switches FSP-OP, pass 1 with
+	 * (MR16 | 0x45) & 0xbc writes the other set.
+	 */
+	rc = qb_table_burst(d, mr16 | 0x41, 0x72);
+	acsm_reset_ptr(d, &cur);
+	acsm_nop(&cur, 0);
+	acsm_mrw(&cur, 3, 16, mr16 | 0x45);
+	acsm_nop(&cur, 255);
+	if (acsm_oneshot(d, cur, 0x75))
+		rc = -1;
+	timer_delay_ticks(4 * RTC_TICKS_PER_US);	/* frequency-change settle */
+	if (qb_table_burst(d, (mr16 | 0x45) & 0xbc, 0x76))
+		rc = -1;
+
+	/* ZQCAL MPC (as step 6.2.5, variant 1) */
+	acsm_reset_ptr(d, &cur);
+	acsm_nop(&cur, acsm_nop_count(5, 1));
+	acsm_put(&cur, acsm_mpc25_hw0(0x0f, 0x86), 0, 0, acsm_cs_hw3(0x0f));
+	acsm_put(&cur, acsm_mpc26_hw0(0, 0x86), 0, 0, acsm_cs_hw3(0));
+	acsm_nop(&cur, acsm_nop_count(16, 1));
+	acsm_nop(&cur, acsm_nop_count(16, 1));
+	acsm_nop(&cur, acsm_nop_count(1, 1));
+	acsm_nop(&cur, acsm_nop_count(10, 1));
+	if (acsm_oneshot(d, cur, 0x73))
+		rc = -1;
+
+	/*
+	 * Quickboot-specific per-rank MR40 = 0x40, MR37 = 0x40, then the
+	 * MR28 tail and the cmd 0x28 entry (docsClean 8110257, eae6813).
+	 */
+	acsm_reset_ptr(d, &cur);
+	acsm_nop(&cur, 0);
+	for (r = 0; r < 2; r++) {
+		if (!(d->c->cs_a & (1u << r)))
+			continue;
+		acsm_mrw(&cur, 1u << r, 40, 0x40);
+		acsm_nop(&cur, acsm_nop_count(0x22, 8));
+		acsm_mrw(&cur, 1u << r, 37, 0x40);
+		acsm_nop(&cur, acsm_nop_count(0x22, 8));
+	}
+	if (!(mb_rd8(MB_MR28_A0) & 0x20)) {
+		acsm_mrw(&cur, 3, 28, mb_rd8(MB_MR28_A0) | 2u);
+		acsm_nop(&cur, acsm_nop_count(0x22, 8));
+	}
+	acsm_put(&cur, 0xc028, 0, 0, 0x0010);	/* cmd 0x28, cs 3 */
+	acsm_put(&cur, 0, 0, 0, 0);
+	acsm_nop(&cur, acsm_nop_count(0x1e, 1));
+	if (acsm_oneshot(d, cur, 0x74))
+		rc = -1;
+
 	csr_wr(CSR_ACSM_BURST + d->ps, 0);
 	csr_wr(BCAST_CSR(0x00a), 0);
 	channel_commit(d);
 	return rc;
+}
+
+/* Commit pulse on 0x2f052, issued only with MsgMisc[0] (docsClean/11). */
+static void qb_pulse_052(const struct devinit *d)
+{
+	if (!(MB_GET(MsgMisc) & 0x01))
+		return;
+	csr_wr(0x2f052, 1);
+	delay_dfi_clks(d, 10);
+	csr_wr(0x2f052, 0);
+}
+
+/* Experiment 015: DLL code read-out (0x200cf) along the quickboot path. */
+static void qb_dll_probe(const struct devinit *d, uint32_t tag)
+{
+	log_words(0, LOG_ID_QB_DLLPROBE, 6, tag, elapsed_us(d), csr_rd(0x200cf),
+		  csr_rd(0x2004e + d->ps), csr_rd(0x20049), csr_rd(0x200c3));
 }
 
 /* docsClean/11 step 6 — hardware DLL / clock recalibration. */
@@ -732,17 +817,22 @@ static void qb_dll_recal(struct devinit *d, uint16_t r20009)
 	csr_wr(0x2f310, 1);
 	csr_wr(0x2f0f8, 1);
 	if (!MB_GET(PllBypassEn)) {
+		uint16_t code;
+
 		csr_wr(0x2f049, u | 0x0400);
 		delay_ps_or_clks(d, 1000u, 0);
 		csr_wr(0x2f0e0, 1);
 		delay_ps_or_clks(d, 1000000u, 0);
-		csr_wr(0x2f049, u | 0x0200);
+		/* 0x200cf is live only while 0x2f0e0 == 1 (docsClean 8110257) */
+		code = csr_rd(0x200cf);
 		csr_wr(0x2f0c3, 1);
 		csr_wr(0x2f0e0, 0);
-		csr_wr(0x2004e + d->ps, csr_rd(0x200cf) & 0x001f);
+		csr_wr(0x2f049, u | 0x0200);
+		csr_wr(0x2004e + d->ps, code & 0x001f);
 	} else {
 		csr_wr(0x2f0c3, 1);
 	}
+	qb_dll_probe(d, 0x77);
 	csr_wr(d->ver ? 0x9f02du : 0x9f028u, 1);	/* level, never cleared */
 	csr_wr(0x2f009 + d->ps, r20009);
 	log_words(0, LOG_ID_QB_DLL, 8, r20009, csr_rd(0x20049), csr_rd(0x200cf),
@@ -782,24 +872,64 @@ static enum train_status quickboot_run(struct devinit *d)
 	csr_wr(0x2008b, (d->pstate & 0x80) ? 0 : (d->pstate & 1));
 	csr_wr(0x20072, d->c->cs_a);
 	csr_wr(0x20073, d->c->cs_b);
+	qb_dll_probe(d, 0x70);
 	devinit_phase1(d);			/* reference clock, 0x200f8 = 1 */
 	dq_block_reset(d);
+	qb_dll_probe(d, 0x73);
 
 	/* step 5: DRAM reset / PLL sequencing with lock wait, clock switch */
 	dram_reset_pll(d);
+	qb_dll_probe(d, 0x74);
 	flush_ok = !devinit_phase6_1(d);	/* ACSM flush; 0x200f8 = 0, PLL clock */
 
 	/* no tINIT; multiplier off before MRW */
+	qb_pulse_052(d);
 	d->mult_en = 0;
 	mrw_ok = !qb_mrw(d);
+
+	/*
+	 * Before step 6 (docsClean e00a07a): back to the direct clock, clear
+	 * 0x2006e, per-rank step, refresh of 0x20072/73 and the ACSM dividers,
+	 * clear 0x01f0b3/b4. Quickboot ends in direct-clock mode.
+	 */
+	csr_wr(CSR_CLKSEL, (uint16_t)((csr_rd(CSR_CLKSEL) & 0xfffc) | 0x0001));
+	delay_dfi_clks(d, 4);
+	csr_wr(0x200f8, 1);
+	delay_dfi_clks(d, 0x1f);
 	csr_wr(0x2006e, 0);
+	for (i = 0; i < 2; i++) {
+		if (!((d->c->cs_a | d->c->cs_b) & (1u << i)))
+			continue;
+		csr_wr(0x20072, d->c->cs_a & (1u << i));
+		csr_wr(0x20073, d->c->cs_b & (1u << i));
+		csr_wr(0x2007a, 0);
+		csr_wr(0x2007e, 0);
+	}
+	csr_wr(0x20072, d->c->cs_a);
+	csr_wr(0x20073, d->c->cs_b);
+	if (d->ver >= 8) {
+		csr_wr(0x90808, (uint16_t)((csr_rd(0x20314) << 8) | 1));
+		csr_wr(0x90813, (uint16_t)((csr_rd(0x20315) << 8) | 1));
+	}
+	csr_wr(BCAST_CSR(0x0b3), 0);
+	csr_wr(BCAST_CSR(0x0b4), 0);
 	report_state(d, 0x75);
 
 	/* step 6 */
+	qb_dll_probe(d, 0x75);
 	qb_dll_recal(d, r20009);
 	commit_strobe();
 	csr_wr(0x000a4, 1);
 	report_state(d, 0x76);
+	/*
+	 * Experiment 016: the host cannot rewrite the message block after a
+	 * PMU run. With the private flag 0xa5 in byte 0, select RdDQS alone
+	 * for the next start of this firmware.
+	 */
+	if (mb_rd8(0x000) == 0xa5) {
+		mb_wr8(0x000, 0);
+		mb_wr16(MB_SequenceCtrl, SEQ_RDDQS);
+	}
 	return flush_ok && mrw_ok ? TRAIN_OK : TRAIN_PARTIAL;
 }
 

@@ -13,7 +13,6 @@
 
 STUB(stage_wrlvl)
 STUB(stage_rxen)
-STUB(stage_rddqs)
 STUB(stage_wrdq)
 STUB(stage_mxrdlat)
 STUB(stage_dram_dca)

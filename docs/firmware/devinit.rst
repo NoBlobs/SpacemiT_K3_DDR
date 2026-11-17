@@ -112,4 +112,9 @@ the DevInit dispatcher (docsClean/11, 066c550): phase 0, startup script,
 Step 3.5 DRAM reset / PLL, Step 6.1 flush, the MRW burst without ``tINIT``,
 and the step 6 DLL recalibration (log ``0x0842``). No period calibration and
 no Step 3.6. The saved ``phypara`` passes are applied by the host
-[:exp:`013`]. Not yet done: the extra MR6/MR7/MR40 writes (question S1).
+[:exp:`013`]. Step 6 samples ``0x200cf`` while ``0x2f0e0 = 1`` and returns the reference
+code [:exp:`016`]. The MR writes follow the two-pass sequence with the FSP switch and the
+``cmd 0x28`` entry [:exp:`018`]. Between the MR tail and step 6 the path switches back to the direct
+clock, clears ``0x2006e``, runs the per-rank step and clears
+``0x01f0b3/b4``; with this order the memory test is clean in 10 of 10 boots
+[:exp:`019`].
